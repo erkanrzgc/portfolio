@@ -60,9 +60,9 @@ export default function FooterSection() {
           })}
         </div>
 
-        <div className="mt-12 flex flex-col gap-3 border-t border-[#D7E2EA]/10 pt-6 text-sm text-[#D7E2EA]/50 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-12 flex flex-col items-center gap-3 border-t border-[#D7E2EA]/10 pt-6 text-center text-sm text-[#D7E2EA]/50 md:flex-row md:justify-center md:gap-8">
           <span>&copy; 2026. All rights reserved.</span>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             <a
               href="/privacy"
               className="transition-colors hover:text-[#D7E2EA]"
