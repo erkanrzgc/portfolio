@@ -11,7 +11,7 @@ export const contactLinks = [
     href: 'https://linkedin.com/in/erkan-risngits-6916a4279',
   },
   {
-    label: 'X / Twitter',
+    label: 'X',
     href: 'https://x.com/erkan_rzgc',
   },
 ]

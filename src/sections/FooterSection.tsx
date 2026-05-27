@@ -1,11 +1,11 @@
-import { ArrowUpRight, Github, Linkedin, Mail, Twitter } from 'lucide-react'
+import { ArrowUpRight, Github, Linkedin, Mail, X as XIcon } from 'lucide-react'
 import FadeIn from '../components/FadeIn'
 import { CONTACT_SECTION_ID, contactLinks } from '../lib/contactLinks'
 
 const iconByLabel = {
   GitHub: Github,
   LinkedIn: Linkedin,
-  'X / Twitter': Twitter,
+  X: XIcon,
 }
 
 export default function FooterSection() {
@@ -60,17 +60,17 @@ export default function FooterSection() {
           })}
         </div>
 
-        <div className="mt-12 flex flex-col items-center gap-3 border-t border-[#D7E2EA]/10 pt-6 text-center text-sm text-[#D7E2EA]/50 md:flex-row md:justify-center md:gap-8">
+        <div className="mt-12 grid gap-3 border-t border-[#D7E2EA]/10 pt-6 text-center text-sm text-[#D7E2EA]/50 md:grid-cols-[1fr_auto_1fr] md:items-center md:text-left">
           <span>&copy; 2026. All rights reserved.</span>
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-            <a
-              href="/privacy"
-              className="transition-colors hover:text-[#D7E2EA]"
-            >
-              Privacy
-            </a>
-            <span>Software Engineer &amp; Cybersecurity Enthusiast</span>
-          </div>
+          <a
+            href="/privacy"
+            className="justify-self-center transition-colors hover:text-[#D7E2EA]"
+          >
+            Privacy
+          </a>
+          <span className="md:justify-self-end md:text-right">
+            Software Engineer &amp; Cybersecurity Enthusiast
+          </span>
         </div>
       </div>
     </footer>
