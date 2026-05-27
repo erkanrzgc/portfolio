@@ -61,8 +61,16 @@ export default function FooterSection() {
         </div>
 
         <div className="mt-12 flex flex-col gap-3 border-t border-[#D7E2EA]/10 pt-6 text-sm text-[#D7E2EA]/50 sm:flex-row sm:items-center sm:justify-between">
-          <span>© 2026. All rights reserved.</span>
-          <span>Software Engineer &amp; Cybersecurity Enthusiast</span>
+          <span>&copy; 2026. All rights reserved.</span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <a
+              href="/privacy"
+              className="transition-colors hover:text-[#D7E2EA]"
+            >
+              Privacy
+            </a>
+            <span>Software Engineer &amp; Cybersecurity Enthusiast</span>
+          </div>
         </div>
       </div>
     </footer>
