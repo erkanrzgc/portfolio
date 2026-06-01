@@ -28,15 +28,15 @@ const FALLBACK_DESCRIPTION =
   'Public GitHub project focused on practical software, security tooling, and engineering experiments.'
 
 export const GITHUB_USERNAME = 'erkanrzgc'
-const EXCLUDED_REPOS = new Set([GITHUB_USERNAME, 'ai-house'])
+const EXCLUDED_REPOS = new Set([GITHUB_USERNAME, 'ai-house', 'portfolio'])
 
 const PROJECT_ORDER = [
+  'steganography',
+  'reverse-engineering',
   'cyberm4fia-scanner',
   'loadkit',
-  'reverse-engineering',
   'cyberm4fia-osint',
   'wlan-dumper',
-  'steganography',
   'firewall',
   'anti-virus',
   'netmask',
