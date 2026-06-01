@@ -51,13 +51,15 @@ export default function HeroSection() {
       {/* Hero Portrait */}
       <div className="absolute left-1/2 top-[62%] z-10 w-[320px] -translate-x-1/2 -translate-y-1/2 sm:top-[64%] sm:w-[430px] md:w-[520px] lg:w-[610px] xl:w-[660px]">
         <FadeIn delay={0.6} y={30} className="w-full">
-          <Magnet padding={360} strength={1.65}>
-            <img
-              src="/images/avatar-transparent.png"
-              alt="Erkan avatar"
-              className="w-full object-contain"
-              loading="eager"
-            />
+          <Magnet padding={360} strength={1.65} className="hero-avatar-magnet">
+            <div className="hero-avatar-float">
+              <img
+                src="/images/avatar-transparent.png"
+                alt="Erkan avatar"
+                className="w-full object-contain"
+                loading="eager"
+              />
+            </div>
           </Magnet>
         </FadeIn>
       </div>

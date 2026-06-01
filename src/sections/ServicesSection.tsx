@@ -11,9 +11,9 @@ import FadeIn from '../components/FadeIn'
 const services = [
   {
     icon: Code2,
-    name: 'Web & Product Engineering',
-    desc: 'Designing and building responsive web products with clean interfaces, stable architecture, and maintainable React/TypeScript code.',
-    points: ['React interfaces', 'Vite apps', 'Release-ready UI'],
+    name: 'Software & Product Engineering',
+    desc: 'Building practical software, polished interfaces, and product-minded systems with clean architecture and maintainable code.',
+    points: ['Product UI', 'React/TypeScript', 'Practical systems'],
   },
   {
     icon: ShieldCheck,

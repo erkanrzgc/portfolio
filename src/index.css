@@ -26,3 +26,30 @@ html, body, #root {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+@keyframes mobile-avatar-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(-0.25deg) scale(1);
+  }
+
+  50% {
+    transform: translate3d(0, -12px, 0) rotate(0.25deg) scale(1.012);
+  }
+}
+
+.hero-avatar-float {
+  transform-origin: 50% 45%;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .hero-avatar-float {
+    animation: mobile-avatar-float 5.5s ease-in-out infinite;
+    will-change: transform;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-avatar-float {
+    animation: none;
+  }
+}
