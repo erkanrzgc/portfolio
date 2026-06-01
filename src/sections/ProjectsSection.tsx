@@ -1,20 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
-import { ArrowUpRight, GitFork, Github, Star } from 'lucide-react'
+import { ArrowUpRight, Github } from 'lucide-react'
 import FadeIn from '../components/FadeIn'
 import {
   fallbackProjects,
   fetchGithubProjects,
   formatRepoName,
+  sortProjects,
   type PortfolioProject,
 } from '../lib/githubProjects'
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value))
-}
 
 function ProjectCard({
   project,
@@ -47,15 +41,37 @@ function ProjectCard({
           href={project.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="block aspect-[1.9/1] overflow-hidden rounded-[28px] bg-[#F4F6F8] sm:rounded-[36px] lg:w-[44%] lg:shrink-0 lg:self-start"
+          className="block aspect-[1.9/1] overflow-hidden rounded-[28px] bg-[#F4F6F8] p-6 text-[#20262D] transition-transform duration-500 group-hover:-translate-y-1 sm:rounded-[36px] sm:p-8 lg:w-[44%] lg:shrink-0 lg:self-start"
           aria-label={`${project.name} GitHub repository`}
         >
-          <img
-            src={project.imageUrl}
-            alt=""
-            className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.02]"
-            loading="lazy"
-          />
+          <div className="flex h-full flex-col justify-between">
+            <div>
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <p className="min-w-0 truncate text-sm font-semibold text-[#20262D]/55 sm:text-base">
+                  erkanrzgc/
+                </p>
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#20262D] shadow-sm">
+                  <Github size={21} />
+                </span>
+              </div>
+
+              <h4 className="max-w-[15ch] text-[clamp(1.7rem,4vw,3.4rem)] font-black uppercase leading-none text-[#20262D] sm:max-w-[18ch]">
+                {formatRepoName(project.name)}
+              </h4>
+              <p className="mt-4 max-w-xl overflow-hidden text-sm font-light leading-relaxed text-[#20262D]/65 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] sm:text-base">
+                {project.description}
+              </p>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-4">
+              <span className="rounded-full border border-[#20262D]/15 bg-white/75 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[#20262D]/55">
+                {project.language}
+              </span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#20262D] text-white">
+                <ArrowUpRight size={18} />
+              </span>
+            </div>
+          </div>
         </a>
 
         <div className="flex flex-1 flex-col justify-between pt-6 lg:pt-0">
@@ -80,19 +96,7 @@ function ProjectCard({
             </p>
           </div>
 
-          <div className="mt-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#D7E2EA]/60">
-              <span>Updated {formatDate(project.updatedAt)}</span>
-              <span className="inline-flex items-center gap-1.5">
-                <Star size={14} />
-                {project.stars}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <GitFork size={14} />
-                {project.forks}
-              </span>
-            </div>
-
+          <div className="mt-8 flex flex-wrap gap-3 sm:justify-end">
             <div className="flex flex-wrap gap-3">
               <a
                 href={project.url}
@@ -123,7 +127,9 @@ function ProjectCard({
 }
 
 export default function ProjectsSection() {
-  const [projects, setProjects] = useState<PortfolioProject[]>(fallbackProjects)
+  const [projects, setProjects] = useState<PortfolioProject[]>(() =>
+    sortProjects(fallbackProjects)
+  )
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
@@ -132,12 +138,14 @@ export default function ProjectsSection() {
     fetchGithubProjects()
       .then((githubProjects) => {
         if (cancelled) return
-        setProjects(githubProjects.length > 0 ? githubProjects : fallbackProjects)
+        setProjects(
+          githubProjects.length > 0 ? githubProjects : sortProjects(fallbackProjects)
+        )
         setStatus('ready')
       })
       .catch(() => {
         if (cancelled) return
-        setProjects(fallbackProjects)
+        setProjects(sortProjects(fallbackProjects))
         setStatus('error')
       })
 

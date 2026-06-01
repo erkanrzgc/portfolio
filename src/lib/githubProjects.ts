@@ -34,15 +34,15 @@ const PROJECT_ORDER = [
   'steganography',
   'reverse-engineering',
   'cyberm4fia-scanner',
+  'tmux-for-windows',
+  'netmask',
+  'spoofer',
   'loadkit',
   'cyberm4fia-osint',
   'wlan-dumper',
   'firewall',
   'anti-virus',
-  'netmask',
-  'spoofer',
   'cyberm4fia-backdoor',
-  'tmux-for-windows',
 ]
 
 const projectRank = new Map(PROJECT_ORDER.map((name, index) => [name, index]))
