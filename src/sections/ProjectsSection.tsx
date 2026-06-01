@@ -161,14 +161,14 @@ export default function ProjectsSection() {
     >
       <div className="mx-auto max-w-7xl">
         <FadeIn delay={0} y={40}>
-          <div className="mb-12 max-w-2xl sm:mb-16 md:mb-20">
+          <div className="mb-12 w-full sm:mb-16 md:mb-20">
             <div>
-              <h2 className="hero-heading text-[clamp(3rem,12vw,160px)] font-black uppercase leading-none tracking-tight">
+              <h2 className="hero-heading w-full whitespace-nowrap text-[4.3rem] font-black uppercase leading-none tracking-tight sm:text-[6rem] md:text-[8rem] lg:text-[9rem] xl:text-[10rem]">
                 Projects
               </h2>
               <p className="mt-4 max-w-2xl text-base font-light leading-relaxed text-[#D7E2EA]/65 sm:text-lg">
-                Public, original GitHub repositories are pulled in automatically.
-                Forks, private work, and hidden profile repos stay out of this list.
+                A curated selection of public tools, experiments, and engineering
+                projects I have built across software, automation, and cybersecurity.
               </p>
             </div>
           </div>
