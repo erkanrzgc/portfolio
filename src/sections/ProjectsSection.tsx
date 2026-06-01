@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
-import { ArrowUpRight, GitFork, Github, Loader2, Star } from 'lucide-react'
+import { ArrowUpRight, GitFork, Github, Star } from 'lucide-react'
 import FadeIn from '../components/FadeIn'
 import {
   fallbackProjects,
@@ -61,18 +61,13 @@ function ProjectCard({
         <div className="flex flex-1 flex-col justify-between pt-6 lg:pt-0">
           <div>
             <div className="mb-6 flex items-start justify-between gap-5">
-              <div className="flex items-center gap-4 sm:gap-6">
-                <span className="text-[clamp(3rem,7vw,7.5rem)] font-black leading-none text-[#D7E2EA]">
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#D7E2EA]/55">
-                    {project.language}
-                  </p>
-                  <h3 className="max-w-[18ch] text-[clamp(1.35rem,2.6vw,3rem)] font-black uppercase leading-none text-[#D7E2EA] sm:max-w-[22ch]">
-                    {formatRepoName(project.name)}
-                  </h3>
-                </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#D7E2EA]/55">
+                  {project.language}
+                </p>
+                <h3 className="max-w-[18ch] text-[clamp(1.6rem,3vw,3.4rem)] font-black uppercase leading-none text-[#D7E2EA] sm:max-w-[22ch]">
+                  {formatRepoName(project.name)}
+                </h3>
               </div>
 
               <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#D7E2EA]/35 text-[#D7E2EA] sm:flex">
@@ -151,8 +146,6 @@ export default function ProjectsSection() {
     }
   }, [])
 
-  const projectCount = useMemo(() => projects.length, [projects])
-
   return (
     <section
       id="projects"
@@ -160,7 +153,7 @@ export default function ProjectsSection() {
     >
       <div className="mx-auto max-w-7xl">
         <FadeIn delay={0} y={40}>
-          <div className="mb-12 flex flex-col gap-5 sm:mb-16 md:mb-20 lg:flex-row lg:items-end lg:justify-between">
+          <div className="mb-12 max-w-2xl sm:mb-16 md:mb-20">
             <div>
               <h2 className="hero-heading text-[clamp(3rem,12vw,160px)] font-black uppercase leading-none tracking-tight">
                 Projects
@@ -169,15 +162,6 @@ export default function ProjectsSection() {
                 Public, original GitHub repositories are pulled in automatically.
                 Forks, private work, and hidden profile repos stay out of this list.
               </p>
-            </div>
-
-            <div className="inline-flex w-fit items-center gap-3 rounded-full border border-[#D7E2EA]/25 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[#D7E2EA]/75">
-              {status === 'loading' && <Loader2 size={16} className="animate-spin" />}
-              <span>
-                {status === 'loading'
-                  ? 'Loading GitHub'
-                  : `${projectCount} public repos`}
-              </span>
             </div>
           </div>
         </FadeIn>

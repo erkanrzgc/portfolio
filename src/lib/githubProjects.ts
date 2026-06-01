@@ -30,6 +30,23 @@ const FALLBACK_DESCRIPTION =
 export const GITHUB_USERNAME = 'erkanrzgc'
 const EXCLUDED_REPOS = new Set([GITHUB_USERNAME, 'ai-house'])
 
+const PROJECT_ORDER = [
+  'cyberm4fia-scanner',
+  'loadkit',
+  'reverse-engineering',
+  'cyberm4fia-osint',
+  'wlan-dumper',
+  'steganography',
+  'firewall',
+  'anti-virus',
+  'netmask',
+  'spoofer',
+  'cyberm4fia-backdoor',
+  'tmux-for-windows',
+]
+
+const projectRank = new Map(PROJECT_ORDER.map((name, index) => [name, index]))
+
 export const fallbackProjects: PortfolioProject[] = [
   {
     name: 'cyberm4fia-scanner',
@@ -82,6 +99,19 @@ export const fallbackProjects: PortfolioProject[] = [
     updatedAt: '2026-05-24T09:42:44Z',
     homepage: 'https://github.com/erkanrzgc/cyberm4fia-osint',
     imageUrl: getOpenGraphImage('cyberm4fia-osint'),
+  },
+  {
+    name: 'wlan-dumper',
+    url: 'https://github.com/erkanrzgc/wlan-dumper',
+    description:
+      'Terminal WiFi security testing toolkit for scanning, capture workflows, and authorized lab assessment.',
+    language: 'Python',
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: '2026-05-29T14:11:29Z',
+    homepage: null,
+    imageUrl: getOpenGraphImage('wlan-dumper'),
   },
   {
     name: 'firewall',
@@ -193,10 +223,25 @@ export function mapRepoToProject(repo: GithubRepo): PortfolioProject {
   }
 }
 
+export function sortProjects(projects: PortfolioProject[]) {
+  return [...projects].sort((a, b) => {
+    const aRank = projectRank.get(a.name) ?? Number.MAX_SAFE_INTEGER
+    const bRank = projectRank.get(b.name) ?? Number.MAX_SAFE_INTEGER
+
+    if (aRank !== bRank) {
+      return aRank - bRank
+    }
+
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  })
+}
+
 export function getDisplayRepos(repos: GithubRepo[]) {
-  return repos
+  const projects = repos
     .filter((repo) => !repo.private && !repo.fork && !EXCLUDED_REPOS.has(repo.name))
     .map(mapRepoToProject)
+
+  return sortProjects(projects)
 }
 
 export async function fetchGithubProjects() {
