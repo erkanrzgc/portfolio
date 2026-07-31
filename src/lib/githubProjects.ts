@@ -30,55 +30,78 @@ const FALLBACK_DESCRIPTION =
 export const GITHUB_USERNAME = 'erkanrzgc'
 const EXCLUDED_REPOS = new Set([GITHUB_USERNAME, 'ai-house', 'portfolio'])
 
-const PROJECT_ORDER = [
-  'steganography',
-  'reverse-engineering',
-  'cyberm4fia-scanner',
-  'tmux-for-windows',
-  'netmask',
-  'spoofer',
-  'loadkit',
-  'cyberm4fia-osint',
-  'wlan-dumper',
+export const CURATED_PROJECT_NAMES = [
+  'vibeprint',
+  'octopus',
+  'autonomous-scanner',
   'firewall',
-  'anti-virus',
-  'cyberm4fia-backdoor',
-]
+  'reverse-engineering',
+  'steganography',
+  'loadkit',
+  'open-source-intelligence',
+] as const
 
-const projectRank = new Map(PROJECT_ORDER.map((name, index) => [name, index]))
+const curatedProjectNames = new Set<string>(CURATED_PROJECT_NAMES)
+const projectRank: ReadonlyMap<string, number> = new Map(
+  CURATED_PROJECT_NAMES.map((name, index) => [name, index])
+)
 
 export const fallbackProjects: PortfolioProject[] = [
   {
-    name: 'cyberm4fia-scanner',
-    url: 'https://github.com/erkanrzgc/cyberm4fia-scanner',
+    name: 'vibeprint',
+    url: 'https://github.com/erkanrzgc/vibeprint',
     description:
-      'AI-powered autonomous penetration testing framework for web, API, network, and cloud security workflows.',
-    language: 'Python',
+      'Chrome MV3 extension that detects AI-built websites and identifies the visual builders behind them.',
+    language: 'TypeScript',
     stars: 0,
     forks: 0,
     isFork: false,
-    updatedAt: '2026-05-26T22:38:07Z',
-    homepage: null,
-    imageUrl: getOpenGraphImage('cyberm4fia-scanner'),
+    updatedAt: '2026-07-31T11:49:02Z',
+    homepage: 'https://erkanrzgc.github.io/vibeprint/',
+    imageUrl: getOpenGraphImage('vibeprint'),
   },
   {
-    name: 'loadkit',
-    url: 'https://github.com/erkanrzgc/loadkit',
+    name: 'octopus',
+    url: 'https://github.com/erkanrzgc/octopus',
     description:
-      'Async multi-protocol load testing CLI with live metrics, exports, scenarios, and CI threshold checks.',
+      'Agentic cybersecurity LLM built for authorized tool use across practical security workflows.',
     language: 'Python',
     stars: 0,
     forks: 0,
     isFork: false,
-    updatedAt: '2026-05-24T11:59:19Z',
-    homepage: 'https://github.com/erkanrzgc/loadkit',
-    imageUrl: getOpenGraphImage('loadkit'),
+    updatedAt: '2026-07-30T18:34:30Z',
+    homepage: 'https://huggingface.co/erkanrzgcc/octopus-gemma-v0.8.1',
+    imageUrl: getOpenGraphImage('octopus'),
+  },
+  {
+    name: 'autonomous-scanner',
+    url: 'https://github.com/erkanrzgc/autonomous-scanner',
+    description:
+      'AI autonomous penetration testing for authorized web, API, network, and cloud assessments.',
+    language: 'Python',
+    stars: 1,
+    forks: 1,
+    isFork: false,
+    updatedAt: '2026-07-25T17:23:53Z',
+    homepage: null,
+    imageUrl: getOpenGraphImage('autonomous-scanner'),
+  },
+  {
+    name: 'firewall',
+    url: 'https://github.com/erkanrzgc/firewall',
+    description: 'Auditable, policy-driven host firewall for Linux and Windows.',
+    language: 'Go',
+    stars: 0,
+    forks: 0,
+    isFork: false,
+    updatedAt: '2026-07-31T12:46:15Z',
+    homepage: null,
+    imageUrl: getOpenGraphImage('firewall'),
   },
   {
     name: 'reverse-engineering',
     url: 'https://github.com/erkanrzgc/reverse-engineering',
-    description:
-      'Rust-powered static reverse-engineering toolkit for binaries, control-flow analysis, and reporting.',
+    description: 'Static reverse-engineering toolkit for ELF, PE, and Mach-O binaries.',
     language: 'Rust',
     stars: 0,
     forks: 0,
@@ -88,115 +111,43 @@ export const fallbackProjects: PortfolioProject[] = [
     imageUrl: getOpenGraphImage('reverse-engineering'),
   },
   {
-    name: 'cyberm4fia-osint',
-    url: 'https://github.com/erkanrzgc/cyberm4fia-osint',
-    description:
-      'Multi-source OSINT scanner for identity pivots, profile liveness scoring, and AI-assisted validation.',
-    language: 'Python',
-    stars: 0,
-    forks: 1,
-    isFork: false,
-    updatedAt: '2026-05-24T09:42:44Z',
-    homepage: 'https://github.com/erkanrzgc/cyberm4fia-osint',
-    imageUrl: getOpenGraphImage('cyberm4fia-osint'),
-  },
-  {
-    name: 'wlan-dumper',
-    url: 'https://github.com/erkanrzgc/wlan-dumper',
-    description:
-      'Terminal WiFi security testing toolkit for scanning, capture workflows, and authorized lab assessment.',
-    language: 'Python',
-    stars: 0,
-    forks: 0,
-    isFork: false,
-    updatedAt: '2026-05-29T14:11:29Z',
-    homepage: null,
-    imageUrl: getOpenGraphImage('wlan-dumper'),
-  },
-  {
-    name: 'firewall',
-    url: 'https://github.com/erkanrzgc/firewall',
-    description: FALLBACK_DESCRIPTION,
-    language: 'Python',
-    stars: 0,
-    forks: 0,
-    isFork: false,
-    updatedAt: '2026-05-23T13:14:10Z',
-    homepage: null,
-    imageUrl: getOpenGraphImage('firewall'),
-  },
-  {
-    name: 'anti-virus',
-    url: 'https://github.com/erkanrzgc/anti-virus',
-    description: FALLBACK_DESCRIPTION,
-    language: 'Python',
-    stars: 0,
-    forks: 0,
-    isFork: false,
-    updatedAt: '2026-05-23T13:13:50Z',
-    homepage: null,
-    imageUrl: getOpenGraphImage('anti-virus'),
-  },
-  {
-    name: 'netmask',
-    url: 'https://github.com/erkanrzgc/netmask',
-    description: FALLBACK_DESCRIPTION,
-    language: 'Python',
-    stars: 0,
-    forks: 0,
-    isFork: false,
-    updatedAt: '2026-05-23T13:13:03Z',
-    homepage: null,
-    imageUrl: getOpenGraphImage('netmask'),
-  },
-  {
     name: 'steganography',
     url: 'https://github.com/erkanrzgc/steganography',
     description:
-      'Dual-purpose steganography toolkit for embedding, extraction, steganalysis, encryption, and carrier plug-ins.',
+      'Steganography toolkit for embedding, extraction, steganalysis, encryption, and carrier plugins.',
     language: 'Python',
-    stars: 0,
+    stars: 2,
     forks: 0,
     isFork: false,
-    updatedAt: '2026-05-23T10:04:52Z',
+    updatedAt: '2026-07-14T10:38:02Z',
     homepage: null,
     imageUrl: getOpenGraphImage('steganography'),
   },
   {
-    name: 'spoofer',
-    url: 'https://github.com/erkanrzgc/spoofer',
-    description: FALLBACK_DESCRIPTION,
+    name: 'loadkit',
+    url: 'https://github.com/erkanrzgc/loadkit',
+    description:
+      'Async multi-protocol load-testing CLI with metrics, scenarios, and CI thresholds.',
     language: 'Python',
     stars: 0,
     forks: 0,
     isFork: false,
-    updatedAt: '2026-05-04T21:03:41Z',
+    updatedAt: '2026-05-24T11:59:19Z',
     homepage: null,
-    imageUrl: getOpenGraphImage('spoofer'),
+    imageUrl: getOpenGraphImage('loadkit'),
   },
   {
-    name: 'cyberm4fia-backdoor',
-    url: 'https://github.com/erkanrzgc/cyberm4fia-backdoor',
-    description: FALLBACK_DESCRIPTION,
+    name: 'open-source-intelligence',
+    url: 'https://github.com/erkanrzgc/open-source-intelligence',
+    description:
+      'Multi-source OSINT toolkit with validation, soft-404 detection, and AI-assisted checks.',
     language: 'Python',
-    stars: 0,
+    stars: 1,
     forks: 0,
     isFork: false,
-    updatedAt: '2026-05-03T17:58:49Z',
+    updatedAt: '2026-07-26T11:42:26Z',
     homepage: null,
-    imageUrl: getOpenGraphImage('cyberm4fia-backdoor'),
-  },
-  {
-    name: 'tmux-for-windows',
-    url: 'https://github.com/erkanrzgc/tmux-for-windows',
-    description: FALLBACK_DESCRIPTION,
-    language: 'JavaScript',
-    stars: 0,
-    forks: 0,
-    isFork: false,
-    updatedAt: '2026-04-08T09:43:36Z',
-    homepage: null,
-    imageUrl: getOpenGraphImage('tmux-for-windows'),
+    imageUrl: getOpenGraphImage('open-source-intelligence'),
   },
 ]
 
@@ -206,6 +157,20 @@ export function getOpenGraphImage(repoName: string) {
 
 export function formatRepoName(name: string) {
   return name.replace(/-/g, ' ')
+}
+
+export function formatUpdatedAt(updatedAt: string) {
+  const date = new Date(updatedAt)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Recently updated'
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date)
 }
 
 export function mapRepoToProject(repo: GithubRepo): PortfolioProject {
@@ -238,10 +203,22 @@ export function sortProjects(projects: PortfolioProject[]) {
 
 export function getDisplayRepos(repos: GithubRepo[]) {
   const projects = repos
-    .filter((repo) => !repo.private && !repo.fork && !EXCLUDED_REPOS.has(repo.name))
+    .filter(
+      (repo) =>
+        !repo.private &&
+        !repo.fork &&
+        !EXCLUDED_REPOS.has(repo.name) &&
+        curatedProjectNames.has(repo.name)
+    )
     .map(mapRepoToProject)
 
   return sortProjects(projects)
+}
+
+export function mergeWithFallback(projects: PortfolioProject[]) {
+  const liveProjects = new Map(projects.map((project) => [project.name, project]))
+
+  return fallbackProjects.map((fallbackProject) => liveProjects.get(fallbackProject.name) ?? fallbackProject)
 }
 
 export async function fetchGithubProjects() {
@@ -259,5 +236,5 @@ export async function fetchGithubProjects() {
   }
 
   const repos = (await response.json()) as GithubRepo[]
-  return getDisplayRepos(repos)
+  return mergeWithFallback(getDisplayRepos(repos))
 }
