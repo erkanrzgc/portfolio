@@ -7,6 +7,7 @@ import {
   Workflow,
 } from 'lucide-react'
 import FadeIn from '../components/FadeIn'
+import SpotlightCard from '../components/SpotlightCard'
 
 const services = [
   {
@@ -47,6 +48,15 @@ const services = [
   },
 ]
 
+const cardSpans = [
+  'lg:col-span-4 lg:row-span-2',
+  'lg:col-span-2',
+  'lg:col-span-2',
+  'lg:col-span-2',
+  'lg:col-span-2',
+  'lg:col-span-2',
+]
+
 export default function ServicesSection() {
   return (
     <section
@@ -66,37 +76,69 @@ export default function ServicesSection() {
         </div>
       </FadeIn>
 
-      <div className="mx-auto flex max-w-5xl flex-col">
+      <ul
+        aria-label="Services I provide"
+        className="mx-auto grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(220px,auto)]"
+      >
         {services.map((s, i) => (
-          <FadeIn key={s.name} delay={i * 0.1} y={30}>
-            <div
-              className="group flex flex-col gap-4 border-t border-[rgba(12,12,12,0.16)] py-8 transition-colors hover:border-[#0C0C0C] sm:flex-row sm:items-start sm:gap-8 sm:py-10 md:py-12"
+          <FadeIn
+            key={s.name}
+            as="li"
+            delay={i * 0.1}
+            y={30}
+            className={cardSpans[i]}
+          >
+            <SpotlightCard
+              className={`h-full overflow-hidden rounded-[28px] border border-[#2c1856]/20 bg-[linear-gradient(135deg,#ffffff_0%,#f7f2ff_58%,#eee6ff_100%)] shadow-[0_18px_45px_rgba(44,24,86,0.1)] ${
+                i === 0 ? 'p-8 sm:p-10 lg:p-12' : 'p-6 sm:p-7'
+              }`}
             >
-              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl border border-[#0C0C0C]/15 bg-[#0C0C0C] text-white transition-transform duration-300 group-hover:translate-x-1 sm:h-20 sm:w-20">
-                <s.icon size={28} strokeWidth={1.8} />
-              </span>
-              <div className="flex flex-col gap-2 sm:pt-4">
-                <h3 className="text-[clamp(1.1rem,2.2vw,2.1rem)] font-semibold uppercase tracking-[0.03em] text-[#0C0C0C]">
-                  {s.name}
-                </h3>
-                <p className="max-w-2xl text-[clamp(0.9rem,1.6vw,1.25rem)] font-light leading-relaxed text-[#0C0C0C]/65">
-                  {s.desc}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {s.points.map((point) => (
-                    <span
-                      key={point}
-                      className="rounded-full border border-[#0C0C0C]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#0C0C0C]/55"
-                    >
-                      {point}
-                    </span>
-                  ))}
+              <div className="flex h-full flex-col">
+                <div className="flex items-start justify-between gap-6">
+                  <span className="text-sm font-semibold tracking-[0.18em] text-[#2c1856]/55">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span
+                    className={`flex shrink-0 items-center justify-center rounded-2xl border border-[#2c1856]/15 bg-white/75 text-[#2c1856] ${
+                      i === 0 ? 'h-20 w-20' : 'h-14 w-14'
+                    }`}
+                  >
+                    <s.icon size={i === 0 ? 36 : 26} strokeWidth={1.8} />
+                  </span>
+                </div>
+                <div className={i === 0 ? 'mt-auto pt-14' : 'mt-10'}>
+                  <h3
+                    className={`font-semibold uppercase leading-[0.95] tracking-[0.02em] text-[#0C0C0C] ${
+                      i === 0
+                        ? 'text-[clamp(2rem,4vw,4.5rem)]'
+                        : 'text-[clamp(1.3rem,2vw,2rem)]'
+                    }`}
+                  >
+                    {s.name}
+                  </h3>
+                  <p
+                    className={`font-light leading-relaxed text-[#0C0C0C]/65 ${
+                      i === 0 ? 'mt-5 max-w-2xl text-lg' : 'mt-4 text-base'
+                    }`}
+                  >
+                    {s.desc}
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {s.points.map((point) => (
+                      <span
+                        key={point}
+                        className="rounded-full border border-[#2c1856]/15 bg-white/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-[#2c1856]/70"
+                      >
+                        {point}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            </SpotlightCard>
           </FadeIn>
         ))}
-      </div>
+      </ul>
     </section>
   )
 }
