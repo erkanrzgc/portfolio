@@ -172,6 +172,7 @@ export function formatUpdatedAt(updatedAt: string) {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: 'UTC',
   }).format(date)
 }
 

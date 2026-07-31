@@ -128,4 +128,8 @@ describe('formatUpdatedAt', () => {
     expect(formatted).toContain('2026')
     expect(formatted).not.toBe('Recently updated')
   })
+
+  it('formats update dates using the UTC calendar day', () => {
+    expect(formatUpdatedAt('2026-07-31T23:30:00Z')).toBe('Jul 31, 2026')
+  })
 })
