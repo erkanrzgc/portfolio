@@ -51,7 +51,7 @@ export const fallbackProjects: PortfolioProject[] = [
     name: 'vibeprint',
     url: 'https://github.com/erkanrzgc/vibeprint',
     description:
-      'Chrome MV3 extension that detects AI-built websites and identifies the visual builders behind them.',
+      'Chrome MV3 extension that detects AI-built websites and identifies visual builders using calibrated fingerprints.',
     language: 'TypeScript',
     stars: 0,
     forks: 0,
@@ -64,7 +64,7 @@ export const fallbackProjects: PortfolioProject[] = [
     name: 'octopus',
     url: 'https://github.com/erkanrzgc/octopus',
     description:
-      'Agentic cybersecurity LLM built for authorized tool use across practical security workflows.',
+      'Agentic cybersecurity LLM for red-team, blue-team, and network workflows with authorized tool use.',
     language: 'Python',
     stars: 0,
     forks: 0,
@@ -77,7 +77,7 @@ export const fallbackProjects: PortfolioProject[] = [
     name: 'autonomous-scanner',
     url: 'https://github.com/erkanrzgc/autonomous-scanner',
     description:
-      'AI autonomous penetration testing for authorized web, API, network, and cloud assessments.',
+      'AI-powered autonomous penetration testing framework for web, API, network, and cloud security workflows.',
     language: 'Python',
     stars: 1,
     forks: 1,
@@ -89,7 +89,8 @@ export const fallbackProjects: PortfolioProject[] = [
   {
     name: 'firewall',
     url: 'https://github.com/erkanrzgc/firewall',
-    description: 'Auditable, policy-driven host firewall for Linux and Windows.',
+    description:
+      'Auditable policy-driven host firewall for Linux and Windows, built in Go and local by default.',
     language: 'Go',
     stars: 0,
     forks: 0,
@@ -101,7 +102,8 @@ export const fallbackProjects: PortfolioProject[] = [
   {
     name: 'reverse-engineering',
     url: 'https://github.com/erkanrzgc/reverse-engineering',
-    description: 'Static reverse-engineering toolkit for ELF, PE, and Mach-O binaries.',
+    description:
+      'Rust-powered static reverse-engineering toolkit for ELF, PE, and Mach-O binaries.',
     language: 'Rust',
     stars: 0,
     forks: 0,
@@ -114,7 +116,7 @@ export const fallbackProjects: PortfolioProject[] = [
     name: 'steganography',
     url: 'https://github.com/erkanrzgc/steganography',
     description:
-      'Steganography toolkit for embedding, extraction, steganalysis, encryption, and carrier plugins.',
+      'Steganography toolkit for embedding, extraction, steganalysis, encryption, and carrier plug-ins.',
     language: 'Python',
     stars: 2,
     forks: 0,
@@ -127,7 +129,7 @@ export const fallbackProjects: PortfolioProject[] = [
     name: 'loadkit',
     url: 'https://github.com/erkanrzgc/loadkit',
     description:
-      'Async multi-protocol load-testing CLI with metrics, scenarios, and CI thresholds.',
+      'Async multi-protocol load testing CLI with live metrics, exports, scenarios, and CI thresholds.',
     language: 'Python',
     stars: 0,
     forks: 0,
@@ -140,7 +142,7 @@ export const fallbackProjects: PortfolioProject[] = [
     name: 'open-source-intelligence',
     url: 'https://github.com/erkanrzgc/open-source-intelligence',
     description:
-      'Multi-source OSINT toolkit with validation, soft-404 detection, and AI-assisted checks.',
+      'Multi-source OSINT scanner with profile validation, soft-404 detection, and AI-assisted identity checks.',
     language: 'Python',
     stars: 1,
     forks: 0,

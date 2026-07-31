@@ -2,11 +2,31 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CURATED_PROJECT_NAMES,
+  fallbackProjects,
   formatUpdatedAt,
   getDisplayRepos,
   mergeWithFallback,
   type GithubRepo,
 } from './githubProjects'
+
+const EXPECTED_FALLBACK_DESCRIPTIONS = {
+  vibeprint:
+    'Chrome MV3 extension that detects AI-built websites and identifies visual builders using calibrated fingerprints.',
+  octopus:
+    'Agentic cybersecurity LLM for red-team, blue-team, and network workflows with authorized tool use.',
+  'autonomous-scanner':
+    'AI-powered autonomous penetration testing framework for web, API, network, and cloud security workflows.',
+  firewall:
+    'Auditable policy-driven host firewall for Linux and Windows, built in Go and local by default.',
+  'reverse-engineering':
+    'Rust-powered static reverse-engineering toolkit for ELF, PE, and Mach-O binaries.',
+  steganography:
+    'Steganography toolkit for embedding, extraction, steganalysis, encryption, and carrier plug-ins.',
+  loadkit:
+    'Async multi-protocol load testing CLI with live metrics, exports, scenarios, and CI thresholds.',
+  'open-source-intelligence':
+    'Multi-source OSINT scanner with profile validation, soft-404 detection, and AI-assisted identity checks.',
+}
 
 function createRepo(name: string, overrides: Partial<GithubRepo> = {}): GithubRepo {
   return {
@@ -83,6 +103,16 @@ describe('mergeWithFallback', () => {
       language: 'Python',
       url: 'https://github.com/erkanrzgc/octopus',
     })
+  })
+})
+
+describe('fallbackProjects', () => {
+  it('uses the canonical description for every curated project', () => {
+    expect(
+      Object.fromEntries(
+        fallbackProjects.map((project) => [project.name, project.description])
+      )
+    ).toEqual(EXPECTED_FALLBACK_DESCRIPTIONS)
   })
 })
 
