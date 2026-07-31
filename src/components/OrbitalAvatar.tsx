@@ -43,238 +43,268 @@ export default function OrbitalAvatar({
 
       if (cancelled) return
 
-      const mobileQuery = window.matchMedia(MOBILE_QUERY)
-      const reducedMotionQuery = window.matchMedia(REDUCED_MOTION_QUERY)
-      const finePointerQuery = window.matchMedia(FINE_POINTER_QUERY)
-      const isMobile = mobileQuery.matches || window.innerWidth < 768
-      const hasFinePointer = finePointerQuery.matches
-      let prefersReducedMotion = reducedMotionQuery.matches
-      let intersectsViewport = true
       let disposed = false
       let frameId: number | null = null
       let resizeObserver: ResizeObserver | null = null
       let intersectionObserver: IntersectionObserver | null = null
       let texture: import('three').Texture | null = null
-      let readySignalled = false
+      let renderer: import('three').WebGLRenderer | null = null
       const geometries: Array<{ dispose: () => void }> = []
       const materials: Array<{ dispose: () => void }> = []
+      const removeListeners: Array<() => void> = []
+      const disposeSafely = (action: () => void) => {
+        try {
+          action()
+        } catch {
+          // Cleanup continues so one faulty resource cannot leak the rest.
+        }
+      }
 
-      let renderer: import('three').WebGLRenderer
       try {
+        const mobileQuery = window.matchMedia(MOBILE_QUERY)
+        const reducedMotionQuery = window.matchMedia(REDUCED_MOTION_QUERY)
+        const finePointerQuery = window.matchMedia(FINE_POINTER_QUERY)
+        const isMobile = mobileQuery.matches || window.innerWidth < 768
+        const hasFinePointer = finePointerQuery.matches
+        let prefersReducedMotion = reducedMotionQuery.matches
+        let intersectsViewport = true
+        let readySignalled = false
+        let sceneReady = false
+
         renderer = new THREE.WebGLRenderer({
           alpha: true,
           antialias: !isMobile,
         })
-      } catch {
-        return
-      }
 
-      renderer.setClearColor(0x000000, 0)
-      renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio || 1, isMobile ? 1.15 : 1.6),
-      )
-
-      const scene = new THREE.Scene()
-      const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100)
-      camera.position.z = 5.4
-      const root = new THREE.Group()
-      scene.add(root)
-
-      const coreGeometry = new THREE.SphereGeometry(
-        1.08,
-        isMobile ? 24 : 36,
-        isMobile ? 18 : 28,
-      )
-      const coreMaterial = new THREE.MeshBasicMaterial({
-        color: 0xa855f7,
-        depthWrite: false,
-        opacity: 0.09,
-        transparent: true,
-      })
-      const core = new THREE.Mesh(coreGeometry, coreMaterial)
-      geometries.push(coreGeometry)
-      materials.push(coreMaterial)
-      root.add(core)
-
-      const atmosphereGeometry = new THREE.SphereGeometry(
-        1.16,
-        isMobile ? 24 : 36,
-        isMobile ? 18 : 28,
-      )
-      const atmosphereMaterial = new THREE.MeshBasicMaterial({
-        blending: THREE.AdditiveBlending,
-        color: 0xa855f7,
-        depthWrite: false,
-        opacity: 0.055,
-        side: THREE.BackSide,
-        transparent: true,
-      })
-      const atmosphere = new THREE.Mesh(
-        atmosphereGeometry,
-        atmosphereMaterial,
-      )
-      geometries.push(atmosphereGeometry)
-      materials.push(atmosphereMaterial)
-      root.add(atmosphere)
-
-      const orbits = getOrbitDefinitions(isMobile)
-      const satellites = orbits.map((orbit) => {
-        const orbitGeometry = new THREE.BufferGeometry()
-        orbitGeometry.setAttribute(
-          'position',
-          new THREE.Float32BufferAttribute(
-            createOrbitPoints(orbit, isMobile ? 56 : 96),
-            3,
-          ),
-        )
-        const orbitMaterial = new THREE.LineBasicMaterial({
-          color: orbit.color,
-          depthWrite: false,
-          opacity: 0.3,
-          transparent: true,
-        })
-        const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial)
-        geometries.push(orbitGeometry)
-        materials.push(orbitMaterial)
-        root.add(orbitLine)
-
-        const satelliteGeometry = new THREE.SphereGeometry(
-          isMobile ? 0.035 : 0.04,
-          10,
-          8,
-        )
-        const satelliteMaterial = new THREE.MeshBasicMaterial({
-          blending: THREE.AdditiveBlending,
-          color: orbit.color,
-          depthWrite: false,
-          transparent: true,
-        })
-        const satellite = new THREE.Mesh(
-          satelliteGeometry,
-          satelliteMaterial,
-        )
-        geometries.push(satelliteGeometry)
-        materials.push(satelliteMaterial)
-        root.add(satellite)
-
-        return { mesh: satellite, orbit }
-      })
-
-      const pointer = { x: 0, y: 0 }
-
-      const resize = () => {
-        if (disposed) return
-        const width = Math.max(1, container.clientWidth)
-        const height = Math.max(1, container.clientHeight)
-        camera.aspect = width / height
-        camera.updateProjectionMatrix()
-        renderer.setSize(width, height, false)
-      }
-
-      const renderFrame = (time: number) => {
-        if (disposed) return
-        const animationTime = prefersReducedMotion ? 0 : time
-
-        satellites.forEach(({ mesh, orbit }) => {
-          const [x, y, z] = createOrbitPosition(
-            orbit,
-            orbit.phase + animationTime * orbit.speed * orbit.direction,
-          )
-          mesh.position.set(x, y, z)
-        })
-
-        root.rotation.x = prefersReducedMotion ? 0.04 : 0.04 + pointer.y * 0.06
-        root.rotation.y = prefersReducedMotion
-          ? 0
-          : animationTime * 0.000025 + pointer.x * 0.08
-        renderer.render(scene, camera)
-      }
-
-      const shouldAnimate = () =>
-        !disposed &&
-        !prefersReducedMotion &&
-        intersectsViewport &&
-        !document.hidden
-
-      const refreshLoop = () => {
-        if (shouldAnimate()) {
-          if (frameId === null) {
-            frameId = requestAnimationFrame(animate)
+        disposeScene = () => {
+          if (disposed) return
+          disposed = true
+          if (frameId !== null) {
+            const scheduledFrame = frameId
+            frameId = null
+            disposeSafely(() => cancelAnimationFrame(scheduledFrame))
           }
-          return
+          disposeSafely(() => resizeObserver?.disconnect())
+          disposeSafely(() => intersectionObserver?.disconnect())
+          removeListeners.splice(0).forEach(disposeSafely)
+          if (texture) disposeSafely(() => texture?.dispose())
+          geometries.forEach((geometry) =>
+            disposeSafely(() => geometry.dispose()),
+          )
+          materials.forEach((material) =>
+            disposeSafely(() => material.dispose()),
+          )
+          disposeSafely(() => renderer?.dispose())
+          disposeSafely(() => renderer?.domElement.remove())
         }
 
-        if (frameId !== null) {
-          cancelAnimationFrame(frameId)
+        renderer.setClearColor(0x000000, 0)
+        renderer.setPixelRatio(
+          Math.min(window.devicePixelRatio || 1, isMobile ? 1.15 : 1.6),
+        )
+
+        const scene = new THREE.Scene()
+        const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100)
+        camera.position.z = 5.4
+        const root = new THREE.Group()
+        scene.add(root)
+
+        const coreGeometry = new THREE.SphereGeometry(
+          1.08,
+          isMobile ? 24 : 36,
+          isMobile ? 18 : 28,
+        )
+        geometries.push(coreGeometry)
+        const coreMaterial = new THREE.MeshBasicMaterial({
+          color: 0xa855f7,
+          depthWrite: false,
+          opacity: 0.09,
+          transparent: true,
+        })
+        materials.push(coreMaterial)
+        const core = new THREE.Mesh(coreGeometry, coreMaterial)
+        root.add(core)
+
+        const atmosphereGeometry = new THREE.SphereGeometry(
+          1.16,
+          isMobile ? 24 : 36,
+          isMobile ? 18 : 28,
+        )
+        geometries.push(atmosphereGeometry)
+        const atmosphereMaterial = new THREE.MeshBasicMaterial({
+          blending: THREE.AdditiveBlending,
+          color: 0xa855f7,
+          depthWrite: false,
+          opacity: 0.055,
+          side: THREE.BackSide,
+          transparent: true,
+        })
+        materials.push(atmosphereMaterial)
+        const atmosphere = new THREE.Mesh(
+          atmosphereGeometry,
+          atmosphereMaterial,
+        )
+        root.add(atmosphere)
+
+        const orbits = getOrbitDefinitions(isMobile)
+        const satellites = orbits.map((orbit) => {
+          const orbitGeometry = new THREE.BufferGeometry()
+          geometries.push(orbitGeometry)
+          orbitGeometry.setAttribute(
+            'position',
+            new THREE.Float32BufferAttribute(
+              createOrbitPoints(orbit, isMobile ? 56 : 96),
+              3,
+            ),
+          )
+          const orbitMaterial = new THREE.LineBasicMaterial({
+            color: orbit.color,
+            depthTest: true,
+            depthWrite: false,
+            opacity: 0.3,
+            transparent: true,
+          })
+          materials.push(orbitMaterial)
+          const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial)
+          orbitLine.renderOrder = 2
+          root.add(orbitLine)
+
+          const satelliteGeometry = new THREE.SphereGeometry(
+            isMobile ? 0.035 : 0.04,
+            10,
+            8,
+          )
+          geometries.push(satelliteGeometry)
+          const satelliteMaterial = new THREE.MeshBasicMaterial({
+            blending: THREE.AdditiveBlending,
+            color: orbit.color,
+            depthTest: true,
+            depthWrite: false,
+            transparent: true,
+          })
+          materials.push(satelliteMaterial)
+          const satellite = new THREE.Mesh(
+            satelliteGeometry,
+            satelliteMaterial,
+          )
+          satellite.renderOrder = 2
+          root.add(satellite)
+
+          return { mesh: satellite, orbit }
+        })
+
+        const pointer = { x: 0, y: 0 }
+
+        const renderFrame = (time: number) => {
+          if (disposed || !renderer) return
+          const animationTime = prefersReducedMotion ? 0 : time
+
+          satellites.forEach(({ mesh, orbit }) => {
+            const [x, y, z] = createOrbitPosition(
+              orbit,
+              orbit.phase + animationTime * orbit.speed * orbit.direction,
+            )
+            mesh.position.set(x, y, z)
+          })
+
+          root.rotation.x = prefersReducedMotion
+            ? 0.04
+            : 0.04 + pointer.y * 0.06
+          root.rotation.y = prefersReducedMotion
+            ? 0
+            : animationTime * 0.000025 + pointer.x * 0.08
+          renderer.render(scene, camera)
+        }
+
+        const resize = () => {
+          if (disposed || !renderer) return
+          const width = Math.max(1, container.clientWidth)
+          const height = Math.max(1, container.clientHeight)
+          camera.aspect = width / height
+          camera.updateProjectionMatrix()
+          renderer.setSize(width, height, false)
+          if (sceneReady && (prefersReducedMotion || frameId === null)) {
+            renderFrame(performance.now())
+          }
+        }
+
+        const shouldAnimate = () =>
+          !disposed &&
+          !prefersReducedMotion &&
+          intersectsViewport &&
+          !document.hidden
+
+        const refreshLoop = () => {
+          if (shouldAnimate()) {
+            if (frameId === null) {
+              frameId = requestAnimationFrame(animate)
+            }
+            return
+          }
+
+          if (frameId !== null) {
+            cancelAnimationFrame(frameId)
+            frameId = null
+          }
+        }
+
+        const animate = (time: number) => {
           frameId = null
-        }
-      }
+          if (disposed) return
 
-      const animate = (time: number) => {
-        frameId = null
-        if (disposed) return
-
-        try {
-          renderFrame(time)
-        } catch {
-          disposeScene()
-          return
-        }
-        refreshLoop()
-      }
-
-      const handleVisibilityChange = () => refreshLoop()
-      const handlePointerMove = (event: PointerEvent) => {
-        if (disposed || prefersReducedMotion) return
-        const bounds = container.getBoundingClientRect()
-        const width = Math.max(1, bounds.width)
-        const height = Math.max(1, bounds.height)
-        pointer.x = ((event.clientX - bounds.left) / width - 0.5) * 2
-        pointer.y = ((event.clientY - bounds.top) / height - 0.5) * 2
-      }
-      const handleReducedMotionChange = (event: MediaQueryListEvent) => {
-        prefersReducedMotion = event.matches
-        refreshLoop()
-        if (prefersReducedMotion) {
           try {
-            renderFrame(0)
+            renderFrame(time)
+            refreshLoop()
           } catch {
             disposeScene()
           }
         }
-      }
 
-      disposeScene = () => {
-        if (disposed) return
-        disposed = true
-        if (frameId !== null) {
-          cancelAnimationFrame(frameId)
-          frameId = null
+        const safelyResize = () => {
+          try {
+            resize()
+          } catch {
+            disposeScene()
+          }
         }
-        resizeObserver?.disconnect()
-        intersectionObserver?.disconnect()
-        window.removeEventListener('resize', resize)
-        document.removeEventListener(
-          'visibilitychange',
-          handleVisibilityChange,
-        )
-        if (hasFinePointer) {
-          window.removeEventListener('pointermove', handlePointerMove)
+        const handleVisibilityChange = () => {
+          try {
+            refreshLoop()
+          } catch {
+            disposeScene()
+          }
         }
-        reducedMotionQuery.removeEventListener(
-          'change',
-          handleReducedMotionChange,
-        )
-        texture?.dispose()
-        geometries.forEach((geometry) => geometry.dispose())
-        materials.forEach((material) => material.dispose())
-        renderer.dispose()
-        renderer.domElement.remove()
-      }
+        const handlePointerMove = (event: PointerEvent) => {
+          if (
+            disposed ||
+            prefersReducedMotion ||
+            !intersectsViewport ||
+            document.hidden
+          ) {
+            return
+          }
 
-      let loadedTexture: import('three').Texture
-      try {
-        loadedTexture = await new Promise<import('three').Texture>(
+          try {
+            const bounds = container.getBoundingClientRect()
+            const width = Math.max(1, bounds.width)
+            const height = Math.max(1, bounds.height)
+            pointer.x = ((event.clientX - bounds.left) / width - 0.5) * 2
+            pointer.y = ((event.clientY - bounds.top) / height - 0.5) * 2
+          } catch {
+            disposeScene()
+          }
+        }
+        const handleReducedMotionChange = (event: MediaQueryListEvent) => {
+          try {
+            prefersReducedMotion = event.matches
+            refreshLoop()
+            if (prefersReducedMotion) renderFrame(0)
+          } catch {
+            disposeScene()
+          }
+        }
+
+        const loadedTexture = await new Promise<import('three').Texture>(
           (resolve, reject) => {
             texture = new THREE.TextureLoader().load(
               AVATAR_TEXTURE,
@@ -284,79 +314,100 @@ export default function OrbitalAvatar({
             )
           },
         )
-      } catch {
-        if (!cancelled) disposeScene()
-        return
-      }
+        if (cancelled || disposed) {
+          if (texture !== loadedTexture) loadedTexture.dispose()
+          return
+        }
+        texture = loadedTexture
+        loadedTexture.colorSpace = THREE.SRGBColorSpace
 
-      if (cancelled || disposed) {
-        if (texture !== loadedTexture) loadedTexture.dispose()
-        return
-      }
-      texture = loadedTexture
-
-      const avatarMaterial = new THREE.SpriteMaterial({
-        alphaTest: 0.02,
-        depthTest: false,
-        depthWrite: false,
-        map: texture,
-        transparent: true,
-      })
-      const avatar = new THREE.Sprite(avatarMaterial)
-      avatar.scale.set(2.12, 2.12, 1)
-      materials.push(avatarMaterial)
-      root.add(avatar)
-
-      const canvas = renderer.domElement
-      canvas.setAttribute('aria-hidden', 'true')
-      Object.assign(canvas.style, {
-        display: 'block',
-        height: '100%',
-        opacity: '0',
-        transition: 'opacity 500ms ease-out',
-        width: '100%',
-      })
-
-      resize()
-      try {
-        renderFrame(performance.now())
-      } catch {
-        disposeScene()
-        return
-      }
-      if (cancelled || disposed) {
-        disposeScene()
-        return
-      }
-
-      container.appendChild(canvas)
-      void canvas.offsetWidth
-      canvas.style.opacity = '1'
-
-      window.addEventListener('resize', resize)
-      document.addEventListener('visibilitychange', handleVisibilityChange)
-      reducedMotionQuery.addEventListener('change', handleReducedMotionChange)
-      if (hasFinePointer) {
-        window.addEventListener('pointermove', handlePointerMove)
-      }
-
-      if (typeof ResizeObserver !== 'undefined') {
-        resizeObserver = new ResizeObserver(resize)
-        resizeObserver.observe(container)
-      }
-      if (typeof IntersectionObserver !== 'undefined') {
-        intersectionObserver = new IntersectionObserver((entries) => {
-          intersectsViewport = entries.some((entry) => entry.isIntersecting)
-          refreshLoop()
+        const avatarMaterial = new THREE.SpriteMaterial({
+          alphaTest: 0.02,
+          depthTest: true,
+          depthWrite: true,
+          map: texture,
+          transparent: true,
         })
-        intersectionObserver.observe(container)
-      }
+        materials.push(avatarMaterial)
+        const avatar = new THREE.Sprite(avatarMaterial)
+        avatar.renderOrder = 1
+        avatar.scale.set(2.12, 2.12, 1)
+        root.add(avatar)
 
-      if (!readySignalled) {
-        readySignalled = true
-        onReadyRef.current?.()
+        const canvas = renderer.domElement
+        canvas.setAttribute('aria-hidden', 'true')
+        Object.assign(canvas.style, {
+          display: 'block',
+          height: '100%',
+          opacity: '0',
+          transition: 'opacity 500ms ease-out',
+          width: '100%',
+        })
+
+        resize()
+        renderFrame(performance.now())
+        sceneReady = true
+        if (cancelled || disposed) {
+          disposeScene()
+          return
+        }
+
+        container.appendChild(canvas)
+        void canvas.offsetWidth
+        canvas.style.opacity = '1'
+
+        window.addEventListener('resize', safelyResize)
+        removeListeners.push(() =>
+          window.removeEventListener('resize', safelyResize),
+        )
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        removeListeners.push(() =>
+          document.removeEventListener(
+            'visibilitychange',
+            handleVisibilityChange,
+          ),
+        )
+        reducedMotionQuery.addEventListener(
+          'change',
+          handleReducedMotionChange,
+        )
+        removeListeners.push(() =>
+          reducedMotionQuery.removeEventListener(
+            'change',
+            handleReducedMotionChange,
+          ),
+        )
+        if (hasFinePointer) {
+          window.addEventListener('pointermove', handlePointerMove)
+          removeListeners.push(() =>
+            window.removeEventListener('pointermove', handlePointerMove),
+          )
+        }
+
+        if (typeof ResizeObserver !== 'undefined') {
+          resizeObserver = new ResizeObserver(safelyResize)
+          resizeObserver.observe(container)
+        }
+        if (typeof IntersectionObserver !== 'undefined') {
+          intersectionObserver = new IntersectionObserver((entries) => {
+            try {
+              intersectsViewport = entries.some((entry) => entry.isIntersecting)
+              refreshLoop()
+            } catch {
+              disposeScene()
+            }
+          })
+          intersectionObserver.observe(container)
+        }
+
+        if (!readySignalled) {
+          readySignalled = true
+          onReadyRef.current?.()
+        }
+        refreshLoop()
+      } catch {
+        disposeScene()
       }
-      refreshLoop()
     }
 
     void initialize()

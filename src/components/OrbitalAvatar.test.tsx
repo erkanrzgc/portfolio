@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const three = vi.hoisted(() => {
   const state = {
     failRenderer: false,
+    rendererConstructor: vi.fn(),
+    rendererMethodFailure: null as 'setClearColor' | 'setPixelRatio' | null,
     textureResult: 'success' as 'success' | 'failure',
     renderers: [] as Array<{
       domElement: HTMLCanvasElement
@@ -13,12 +15,25 @@ const three = vi.hoisted(() => {
       setPixelRatio: ReturnType<typeof vi.fn>
       setSize: ReturnType<typeof vi.fn>
     }>,
-    textures: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,
+    textures: [] as Array<{
+      colorSpace?: unknown
+      dispose: ReturnType<typeof vi.fn>
+    }>,
     geometries: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,
-    materials: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,
-    lines: [] as unknown[],
+    materials: [] as Array<{
+      dispose: ReturnType<typeof vi.fn>
+      options: Record<string, unknown>
+    }>,
+    lines: [] as Array<{
+      material: { options: Record<string, unknown> }
+      renderOrder: number
+    }>,
     meshes: [] as Array<{
       position: { set: ReturnType<typeof vi.fn> }
+    }>,
+    sprites: [] as Array<{
+      material: { options: Record<string, unknown> }
+      renderOrder: number
     }>,
   }
 
@@ -63,9 +78,11 @@ vi.mock('three', () => {
       rotation = { x: 0, y: 0, z: 0 }
     },
     Line: class {
+      renderOrder = 0
+
       constructor(
         public geometry: unknown,
-        public material: unknown,
+        public material: { options: Record<string, unknown> },
       ) {
         three.lines.push(this)
       }
@@ -93,11 +110,15 @@ vi.mock('three', () => {
     SphereGeometry: class extends DisposableGeometry {},
     Sprite: class {
       position = createPosition()
+      renderOrder = 0
       scale = { set: vi.fn() }
 
-      constructor(public material: unknown) {}
+      constructor(public material: { options: Record<string, unknown> }) {
+        three.sprites.push(this)
+      }
     },
     SpriteMaterial: DisposableMaterial,
+    SRGBColorSpace: 'srgb',
     TextureLoader: class {
       load(
         _url: string,
@@ -127,10 +148,21 @@ vi.mock('three', () => {
       setSize = vi.fn()
 
       constructor(public options: Record<string, unknown>) {
+        three.rendererConstructor(options)
         if (three.failRenderer) {
           throw new Error('renderer unavailable')
         }
 
+        this.setClearColor.mockImplementation(() => {
+          if (three.rendererMethodFailure === 'setClearColor') {
+            throw new Error('clear color failed')
+          }
+        })
+        this.setPixelRatio.mockImplementation(() => {
+          if (three.rendererMethodFailure === 'setPixelRatio') {
+            throw new Error('pixel ratio failed')
+          }
+        })
         three.renderers.push(this)
       }
     },
@@ -158,7 +190,10 @@ interface ControlledBrowser {
   }>
 }
 
-function installControlledBrowser({ reducedMotion = false } = {}): ControlledBrowser {
+function installControlledBrowser({
+  finePointer = false,
+  reducedMotion = false,
+} = {}): ControlledBrowser {
   let frameId = 0
   const pendingFrames = new Map<number, FrameRequestCallback>()
   const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
@@ -179,7 +214,11 @@ function installControlledBrowser({ reducedMotion = false } = {}): ControlledBro
       const queryList = {
         addEventListener: vi.fn(),
         matches:
-          query === '(prefers-reduced-motion: reduce)' ? reducedMotion : false,
+          query === '(prefers-reduced-motion: reduce)'
+            ? reducedMotion
+            : query === '(hover: hover) and (pointer: fine)'
+              ? finePointer
+              : false,
         media: query,
         onchange: null,
         removeEventListener: vi.fn(),
@@ -232,6 +271,8 @@ function installControlledBrowser({ reducedMotion = false } = {}): ControlledBro
 
 beforeEach(() => {
   three.failRenderer = false
+  three.rendererConstructor.mockClear()
+  three.rendererMethodFailure = null
   three.textureResult = 'success'
   three.renderers.length = 0
   three.textures.length = 0
@@ -239,6 +280,7 @@ beforeEach(() => {
   three.materials.length = 0
   three.lines.length = 0
   three.meshes.length = 0
+  three.sprites.length = 0
   Object.defineProperty(window, 'innerWidth', {
     configurable: true,
     value: 1024,
@@ -277,6 +319,21 @@ describe('OrbitalAvatar', () => {
     expect(wrapper).toHaveAttribute('aria-hidden', 'true')
     expect(wrapper).toHaveClass('pointer-events-none', 'hero-orbit')
     expect(wrapper?.querySelector('canvas')).toBeNull()
+    expect(three.rendererConstructor).toHaveBeenCalledTimes(1)
+    expect(onReady).not.toHaveBeenCalled()
+  })
+
+  it('disposes renderer initialization when configuration throws', async () => {
+    installControlledBrowser()
+    three.rendererMethodFailure = 'setClearColor'
+    const onReady = vi.fn()
+
+    const rendered = render(<OrbitalAvatar onReady={onReady} />)
+
+    await waitFor(() =>
+      expect(three.renderers[0]?.dispose).toHaveBeenCalledTimes(1),
+    )
+    expect(rendered.container.querySelector('canvas')).toBeNull()
     expect(onReady).not.toHaveBeenCalled()
   })
 
@@ -308,6 +365,29 @@ describe('OrbitalAvatar', () => {
     expect(browser.pendingFrames).toHaveLength(1)
   })
 
+  it('uses the avatar as a depth-writing prepass before depth-tested orbit lines', async () => {
+    installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.sprites).toHaveLength(1))
+    const avatar = three.sprites[0]
+    expect(avatar.material.options.alphaTest).toEqual(expect.any(Number))
+    expect(avatar.material.options.alphaTest).toBeGreaterThan(0)
+    expect(avatar.material.options.depthTest).toBe(true)
+    expect(avatar.material.options.depthWrite).toBe(true)
+    expect(avatar.material.options.map).toBe(three.textures[0])
+    expect(three.textures[0].colorSpace).toBe('srgb')
+    expect(three.lines.length).toBeGreaterThan(0)
+    expect(
+      three.lines.every(
+        (line) =>
+          line.renderOrder > avatar.renderOrder &&
+          line.material.options.depthTest === true &&
+          line.material.options.depthWrite === false,
+      ),
+    ).toBe(true)
+  })
+
   it('does not recreate the scene when the readiness callback identity changes', async () => {
     installControlledBrowser()
     const firstOnReady = vi.fn()
@@ -324,11 +404,30 @@ describe('OrbitalAvatar', () => {
   })
 
   it('cancels work and exhaustively disposes initialized resources on unmount', async () => {
-    const browser = installControlledBrowser()
+    const browser = installControlledBrowser({ finePointer: true })
+    const windowAddEventListener = vi.spyOn(window, 'addEventListener')
+    const windowRemoveEventListener = vi.spyOn(window, 'removeEventListener')
+    const documentAddEventListener = vi.spyOn(document, 'addEventListener')
+    const documentRemoveEventListener = vi.spyOn(document, 'removeEventListener')
     const onReady = vi.fn()
     const rendered = render(<OrbitalAvatar onReady={onReady} />)
 
     await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalled())
+    const resizeHandler = windowAddEventListener.mock.calls.find(
+      ([type]) => type === 'resize',
+    )?.[1]
+    const pointerHandler = windowAddEventListener.mock.calls.find(
+      ([type]) => type === 'pointermove',
+    )?.[1]
+    const visibilityHandler = documentAddEventListener.mock.calls.find(
+      ([type]) => type === 'visibilitychange',
+    )?.[1]
+    const reducedMotionMedia = browser.media.get(
+      '(prefers-reduced-motion: reduce)',
+    )
+    const reducedMotionHandler = reducedMotionMedia?.addEventListener.mock.calls.find(
+      ([type]) => type === 'change',
+    )?.[1]
     const scheduledCallback = [...browser.pendingFrames.values()][0]
     rendered.unmount()
 
@@ -342,6 +441,22 @@ describe('OrbitalAvatar', () => {
     expect(three.materials.every((material) => material.dispose.mock.calls.length === 1)).toBe(true)
     expect(three.renderers[0].dispose).toHaveBeenCalledTimes(1)
     expect(rendered.container.querySelector('canvas')).toBeNull()
+    expect(windowRemoveEventListener).toHaveBeenCalledWith(
+      'resize',
+      resizeHandler,
+    )
+    expect(windowRemoveEventListener).toHaveBeenCalledWith(
+      'pointermove',
+      pointerHandler,
+    )
+    expect(documentRemoveEventListener).toHaveBeenCalledWith(
+      'visibilitychange',
+      visibilityHandler,
+    )
+    expect(reducedMotionMedia?.removeEventListener).toHaveBeenCalledWith(
+      'change',
+      reducedMotionHandler,
+    )
 
     act(() => scheduledCallback(2000))
     expect(onReady).toHaveBeenCalledTimes(1)
@@ -355,6 +470,21 @@ describe('OrbitalAvatar', () => {
 
     await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalledTimes(1))
     expect(rendered.container.querySelectorAll('canvas')).toHaveLength(1)
+    expect(browser.requestAnimationFrame).not.toHaveBeenCalled()
+  })
+
+  it('redraws the stable reduced-motion frame after resize', async () => {
+    const browser = installControlledBrowser({ reducedMotion: true })
+    render(<OrbitalAvatar />)
+
+    await waitFor(() =>
+      expect(three.renderers[0]?.render).toHaveBeenCalledTimes(1),
+    )
+    act(() =>
+      browser.resizeObservers[0].callback([], {} as ResizeObserver),
+    )
+
+    expect(three.renderers[0].render).toHaveBeenCalledTimes(2)
     expect(browser.requestAnimationFrame).not.toHaveBeenCalled()
   })
 
@@ -418,5 +548,44 @@ describe('OrbitalAvatar', () => {
       ),
     )
     expect(browser.pendingFrames).toHaveLength(1)
+  })
+
+  it('skips pointer layout work while offscreen or document-hidden', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    const getBoundingClientRect = vi.spyOn(wrapper, 'getBoundingClientRect')
+
+    act(() =>
+      browser.intersectionObservers[0].callback(
+        [{ isIntersecting: false } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    )
+    act(() =>
+      window.dispatchEvent(
+        new MouseEvent('pointermove', { clientX: 10, clientY: 10 }),
+      ),
+    )
+
+    act(() =>
+      browser.intersectionObservers[0].callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    )
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: true,
+    })
+    act(() =>
+      window.dispatchEvent(
+        new MouseEvent('pointermove', { clientX: 20, clientY: 20 }),
+      ),
+    )
+
+    expect(getBoundingClientRect).not.toHaveBeenCalled()
   })
 })
