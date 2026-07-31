@@ -14,7 +14,7 @@ export default function GithubContributions() {
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Github aria-hidden="true" size={22} className="text-[#7EE787]/70" />
+          <Github aria-hidden="true" size={22} className="text-[#7EE787]" />
           <h3
             id="github-activity-title"
             className="text-xl font-bold text-[#D7E2EA] sm:text-2xl"

@@ -31,6 +31,13 @@ describe('GithubContributions', () => {
         .getByRole('heading', { name: 'GitHub Contributions' })
         .closest('section')
     ).toHaveClass('border-[#39D353]/25')
+
+    const contributionSection = screen
+      .getByRole('heading', { name: 'GitHub Contributions' })
+      .closest('section')
+    const githubIcon = contributionSection?.querySelector('svg.lucide-github')
+    expect(githubIcon).toHaveClass('text-[#7EE787]')
+    expect(githubIcon).not.toHaveClass('text-[#7EE787]/70')
   })
 
   it('replaces a broken chart with an accessible profile link', () => {
