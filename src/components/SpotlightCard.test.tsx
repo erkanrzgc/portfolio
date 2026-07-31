@@ -37,6 +37,30 @@ function installMatchMedia({ finePointer = false, reducedMotion = false } = {}) 
   return queries
 }
 
+function installLegacyMatchMedia({ finePointer = false, reducedMotion = false } = {}) {
+  const queries = new Map<string, ControlledMediaQuery & {
+    addListener: ReturnType<typeof vi.fn>
+    removeListener: ReturnType<typeof vi.fn>
+  }>()
+
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => {
+    const listeners = new Set<(event: MediaQueryListEvent) => void>()
+    const mediaQuery = {
+      addListener: vi.fn((callback: (event: MediaQueryListEvent) => void) => listeners.add(callback)),
+      matches: query === REDUCED_MOTION_QUERY ? reducedMotion : query === FINE_POINTER_QUERY ? finePointer : false,
+      removeListener: vi.fn((callback: (event: MediaQueryListEvent) => void) => listeners.delete(callback)),
+      setMatches(matches: boolean) {
+        mediaQuery.matches = matches
+        listeners.forEach((listener) => listener({ matches } as MediaQueryListEvent))
+      },
+    }
+    queries.set(query, mediaQuery as typeof mediaQuery & ControlledMediaQuery)
+    return mediaQuery
+  }))
+
+  return queries
+}
+
 function mockRect(element: Element, left = 20, top = 30) {
   return vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
     bottom: top + 100,
@@ -96,6 +120,19 @@ describe('SpotlightCard', () => {
     expect(card.style.getPropertyValue('--spotlight-y')).toBe('')
   })
 
+  it('does not track touch pointers when fine-pointer media is enabled', () => {
+    installMatchMedia({ finePointer: true })
+    render(<SpotlightCard>Content</SpotlightCard>)
+    const card = screen.getByRole('article')
+    const getBoundingClientRect = mockRect(card)
+
+    fireEvent.pointerMove(card, { clientX: 80, clientY: 110, pointerType: 'touch' })
+
+    expect(getBoundingClientRect).not.toHaveBeenCalled()
+    expect(card.style.getPropertyValue('--spotlight-x')).toBe('')
+    expect(card.style.getPropertyValue('--spotlight-y')).toBe('')
+  })
+
   it('updates tracking when media preferences change', () => {
     const queries = installMatchMedia()
     render(<SpotlightCard>Content</SpotlightCard>)
@@ -126,6 +163,25 @@ describe('SpotlightCard', () => {
 
     expect(reducedMotion.removeEventListener).toHaveBeenCalledWith('change', reducedHandler)
     expect(finePointer.removeEventListener).toHaveBeenCalledWith('change', fineHandler)
+  })
+
+  it('uses legacy media listeners to refresh tracking and clean up', () => {
+    const queries = installLegacyMatchMedia()
+    const rendered = render(<SpotlightCard>Content</SpotlightCard>)
+    const card = screen.getByRole('article')
+    const getBoundingClientRect = mockRect(card)
+    const reducedMotion = queries.get(REDUCED_MOTION_QUERY)!
+    const finePointer = queries.get(FINE_POINTER_QUERY)!
+    const reducedHandler = reducedMotion.addListener.mock.calls[0][0]
+    const fineHandler = finePointer.addListener.mock.calls[0][0]
+
+    act(() => finePointer.setMatches(true))
+    fireEvent.pointerMove(card, { clientX: 80, clientY: 110 })
+    rendered.unmount()
+
+    expect(getBoundingClientRect).toHaveBeenCalledTimes(1)
+    expect(reducedMotion.removeListener).toHaveBeenCalledWith(reducedHandler)
+    expect(finePointer.removeListener).toHaveBeenCalledWith(fineHandler)
   })
 
   it('renders semantic article content with merged classes', () => {

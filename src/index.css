@@ -111,7 +111,7 @@ html, body, #root {
   box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.18);
 }
 
-@media (hover: hover) and (pointer: fine) {
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .spotlight-card {
     background: rgba(34, 22, 50, 0.72);
     transform: perspective(900px) translateY(0);
@@ -143,6 +143,11 @@ html, body, #root {
 
   .spotlight-card,
   .spotlight-card::before {
+    transform: none;
+    transition: none;
+  }
+
+  .spotlight-card:hover {
     transform: none;
     transition: none;
   }

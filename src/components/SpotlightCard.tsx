@@ -3,6 +3,16 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 const FINE_POINTER_QUERY = '(hover: hover) and (pointer: fine)'
 
+function observeMediaChange(mediaQuery: MediaQueryList, callback: () => void) {
+  if (typeof mediaQuery.addEventListener === 'function') {
+    mediaQuery.addEventListener('change', callback)
+    return () => mediaQuery.removeEventListener('change', callback)
+  }
+
+  mediaQuery.addListener(callback)
+  return () => mediaQuery.removeListener(callback)
+}
+
 interface SpotlightCardProps {
   children: ReactNode
   className?: string
@@ -18,12 +28,12 @@ export default function SpotlightCard({ children, className }: SpotlightCardProp
     const updateTracking = () => setCanTrackPointer(!reducedMotion.matches && finePointer.matches)
 
     updateTracking()
-    reducedMotion.addEventListener('change', updateTracking)
-    finePointer.addEventListener('change', updateTracking)
+    const removeReducedMotionListener = observeMediaChange(reducedMotion, updateTracking)
+    const removeFinePointerListener = observeMediaChange(finePointer, updateTracking)
 
     return () => {
-      reducedMotion.removeEventListener('change', updateTracking)
-      finePointer.removeEventListener('change', updateTracking)
+      removeReducedMotionListener()
+      removeFinePointerListener()
     }
   }, [])
 
@@ -32,7 +42,7 @@ export default function SpotlightCard({ children, className }: SpotlightCardProp
       ref={cardRef}
       className={['spotlight-card', className].filter(Boolean).join(' ')}
       onPointerMove={(event) => {
-        if (!canTrackPointer) return
+        if (!canTrackPointer || event.pointerType === 'touch') return
 
         const card = cardRef.current
         if (!card) return
