@@ -89,7 +89,7 @@ export default function ServicesSection() {
             className={cardSpans[i]}
           >
             <SpotlightCard
-              className={`h-full overflow-hidden rounded-[28px] border border-[#2c1856]/20 bg-[linear-gradient(135deg,#ffffff_0%,#f7f2ff_58%,#eee6ff_100%)] shadow-[0_18px_45px_rgba(44,24,86,0.1)] ${
+              className={`spotlight-card--light h-full overflow-hidden rounded-[28px] border border-[#2c1856]/20 bg-[linear-gradient(135deg,#ffffff_0%,#f7f2ff_58%,#eee6ff_100%)] shadow-[0_18px_45px_rgba(44,24,86,0.1)] ${
                 i === 0 ? 'p-8 sm:p-10 lg:p-12' : 'p-6 sm:p-7'
               }`}
             >

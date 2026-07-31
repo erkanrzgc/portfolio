@@ -136,6 +136,11 @@ html, body, #root {
   }
 }
 
+.spotlight-card.spotlight-card--light {
+  background: linear-gradient(135deg, #fff 0%, #fbf8ff 55%, #f0e7ff 100%);
+  border-color: rgba(44, 24, 86, 0.16);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-avatar-fallback-motion {
     animation: none;

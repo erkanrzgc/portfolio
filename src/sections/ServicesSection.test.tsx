@@ -84,6 +84,9 @@ describe('ServicesSection', () => {
 
     const articles = within(serviceList).getAllByRole('article')
     expect(articles).toHaveLength(6)
+    articles.forEach((article) => {
+      expect(article).toHaveClass('spotlight-card--light')
+    })
     expect(
       articles.map((article) => within(article).getByRole('heading').textContent),
     ).toEqual(serviceTitles)
