@@ -76,6 +76,11 @@ html, body, #root {
   }
 }
 
+.avatar-glass-fallback[data-state='ready'] {
+  animation: none;
+  will-change: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .avatar-glass-fallback {
     animation: none;

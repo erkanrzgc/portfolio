@@ -9,10 +9,25 @@ vi.mock('../components/FadeIn', () => ({
 }))
 
 vi.mock('../components/OrbitalAvatar', () => ({
-  default: ({ onReady }: { onReady?: () => void }) => (
-    <button data-testid="orbital-ready" onClick={onReady} type="button">
-      Orbital avatar
-    </button>
+  default: ({
+    onReady,
+    onUnavailable,
+  }: {
+    onReady?: () => void
+    onUnavailable?: () => void
+  }) => (
+    <>
+      <button data-testid="orbital-ready" onClick={onReady} type="button">
+        Orbital avatar ready
+      </button>
+      <button
+        data-testid="orbital-unavailable"
+        onClick={onUnavailable}
+        type="button"
+      >
+        Orbital avatar unavailable
+      </button>
+    </>
   ),
 }))
 
@@ -22,20 +37,39 @@ describe('HeroSection', () => {
     const avatar = screen.getByRole('img', { name: 'Erkan avatar' })
     const fallback = avatar.closest('[data-avatar-fallback]')
     expect(fallback).toHaveClass('opacity-100')
+    expect(fallback).toHaveAttribute('data-state', 'loading')
     fireEvent.click(screen.getByTestId('orbital-ready'))
     expect(screen.getByRole('img', { name: 'Erkan avatar' })).toBeInTheDocument()
     expect(fallback).toHaveClass('opacity-0')
+    expect(fallback).toHaveAttribute('data-state', 'ready')
+
+    fireEvent.click(screen.getByTestId('orbital-unavailable'))
+    expect(screen.getByRole('img', { name: 'Erkan avatar' })).toBeInTheDocument()
+    expect(fallback).toHaveClass('opacity-100')
+    expect(fallback).toHaveAttribute('data-state', 'loading')
   })
 
   it('renders one eager avatar fallback alongside the existing hero content', () => {
     render(<HeroSection />)
 
     expect(screen.getAllByTestId('orbital-ready')).toHaveLength(1)
-    expect(screen.getByRole('img', { name: 'Erkan avatar' })).toHaveAttribute(
+    const avatar = screen.getByRole('img', { name: 'Erkan avatar' })
+    const fallback = avatar.closest('[data-avatar-fallback]')
+    expect(fallback).toHaveClass(
+      'absolute',
+      'aspect-square',
+      'left-1/2',
+      'top-1/2',
+      'w-[min(52vw,430px)]',
+      '-translate-x-1/2',
+      '-translate-y-1/2',
+    )
+    expect(avatar).toHaveClass('w-full', 'object-contain')
+    expect(avatar).toHaveAttribute(
       'src',
       '/images/avatar-transparent.png',
     )
-    expect(screen.getByRole('img', { name: 'Erkan avatar' })).toHaveAttribute(
+    expect(avatar).toHaveAttribute(
       'loading',
       'eager',
     )

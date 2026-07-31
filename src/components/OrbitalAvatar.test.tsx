@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const three = vi.hoisted(() => {
   const state = {
+    failRender: false,
     failRenderer: false,
     rendererConstructor: vi.fn(),
     rendererMethodFailure: null as 'setClearColor' | 'setPixelRatio' | null,
@@ -142,7 +143,11 @@ vi.mock('three', () => {
     WebGLRenderer: class {
       domElement = document.createElement('canvas')
       dispose = vi.fn()
-      render = vi.fn()
+      render = vi.fn(() => {
+        if (three.failRender) {
+          throw new Error('render failed')
+        }
+      })
       setClearColor = vi.fn()
       setPixelRatio = vi.fn()
       setSize = vi.fn()
@@ -270,6 +275,7 @@ function installControlledBrowser({
 }
 
 beforeEach(() => {
+  three.failRender = false
   three.failRenderer = false
   three.rendererConstructor.mockClear()
   three.rendererMethodFailure = null
@@ -365,6 +371,28 @@ describe('OrbitalAvatar', () => {
     expect(browser.pendingFrames).toHaveLength(1)
   })
 
+  it('removes a failed scene and signals unavailability once after readiness', async () => {
+    const browser = installControlledBrowser()
+    const onReady = vi.fn()
+    const onUnavailable = vi.fn()
+    const rendered = render(
+      <OrbitalAvatar onReady={onReady} onUnavailable={onUnavailable} />,
+    )
+
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1))
+    const [frameId, frame] = [...browser.pendingFrames.entries()][0]
+    browser.pendingFrames.delete(frameId)
+    three.failRender = true
+
+    act(() => frame(1000))
+    act(() => frame(2000))
+
+    expect(onUnavailable).toHaveBeenCalledTimes(1)
+    expect(three.renderers[0].dispose).toHaveBeenCalledTimes(1)
+    expect(rendered.container.querySelector('canvas')).toBeNull()
+    expect(browser.pendingFrames).toHaveLength(0)
+  })
+
   it('uses the avatar as a depth-writing prepass before depth-tested orbit lines', async () => {
     installControlledBrowser()
     render(<OrbitalAvatar />)
@@ -403,6 +431,26 @@ describe('OrbitalAvatar', () => {
     expect(secondOnReady).not.toHaveBeenCalled()
   })
 
+  it('uses the latest unavailability callback without recreating the scene', async () => {
+    const browser = installControlledBrowser()
+    const firstOnUnavailable = vi.fn()
+    const secondOnUnavailable = vi.fn()
+    const rendered = render(
+      <OrbitalAvatar onUnavailable={firstOnUnavailable} />,
+    )
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    rendered.rerender(<OrbitalAvatar onUnavailable={secondOnUnavailable} />)
+    const [frameId, frame] = [...browser.pendingFrames.entries()][0]
+    browser.pendingFrames.delete(frameId)
+    three.failRender = true
+    act(() => frame(1000))
+
+    expect(three.renderers).toHaveLength(1)
+    expect(firstOnUnavailable).not.toHaveBeenCalled()
+    expect(secondOnUnavailable).toHaveBeenCalledTimes(1)
+  })
+
   it('cancels work and exhaustively disposes initialized resources on unmount', async () => {
     const browser = installControlledBrowser({ finePointer: true })
     const windowAddEventListener = vi.spyOn(window, 'addEventListener')
@@ -410,7 +458,10 @@ describe('OrbitalAvatar', () => {
     const documentAddEventListener = vi.spyOn(document, 'addEventListener')
     const documentRemoveEventListener = vi.spyOn(document, 'removeEventListener')
     const onReady = vi.fn()
-    const rendered = render(<OrbitalAvatar onReady={onReady} />)
+    const onUnavailable = vi.fn()
+    const rendered = render(
+      <OrbitalAvatar onReady={onReady} onUnavailable={onUnavailable} />,
+    )
 
     await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalled())
     const resizeHandler = windowAddEventListener.mock.calls.find(
@@ -460,6 +511,7 @@ describe('OrbitalAvatar', () => {
 
     act(() => scheduledCallback(2000))
     expect(onReady).toHaveBeenCalledTimes(1)
+    expect(onUnavailable).not.toHaveBeenCalled()
     expect(browser.requestAnimationFrame).toHaveBeenCalledTimes(1)
   })
 

@@ -9,6 +9,7 @@ import {
 export interface OrbitalAvatarProps {
   className?: string
   onReady?: () => void
+  onUnavailable?: () => void
 }
 
 const AVATAR_TEXTURE = '/images/avatar-transparent.png'
@@ -19,10 +20,13 @@ const FINE_POINTER_QUERY = '(hover: hover) and (pointer: fine)'
 export default function OrbitalAvatar({
   className,
   onReady,
+  onUnavailable,
 }: OrbitalAvatarProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const onReadyRef = useRef(onReady)
+  const onUnavailableRef = useRef(onUnavailable)
   onReadyRef.current = onReady
+  onUnavailableRef.current = onUnavailable
 
   useEffect(() => {
     const currentContainer = containerRef.current
@@ -49,6 +53,8 @@ export default function OrbitalAvatar({
       let intersectionObserver: IntersectionObserver | null = null
       let texture: import('three').Texture | null = null
       let renderer: import('three').WebGLRenderer | null = null
+      let sceneReady = false
+      let unavailableSignalled = false
       const geometries: Array<{ dispose: () => void }> = []
       const materials: Array<{ dispose: () => void }> = []
       const removeListeners: Array<() => void> = []
@@ -57,6 +63,15 @@ export default function OrbitalAvatar({
           action()
         } catch {
           // Cleanup continues so one faulty resource cannot leak the rest.
+        }
+      }
+      const failScene = () => {
+        const shouldNotify =
+          sceneReady && !cancelled && !disposed && !unavailableSignalled
+        disposeScene()
+        if (shouldNotify) {
+          unavailableSignalled = true
+          disposeSafely(() => onUnavailableRef.current?.())
         }
       }
 
@@ -69,7 +84,6 @@ export default function OrbitalAvatar({
         let prefersReducedMotion = reducedMotionQuery.matches
         let intersectsViewport = true
         let readySignalled = false
-        let sceneReady = false
 
         renderer = new THREE.WebGLRenderer({
           alpha: true,
@@ -256,7 +270,7 @@ export default function OrbitalAvatar({
             renderFrame(time)
             refreshLoop()
           } catch {
-            disposeScene()
+            failScene()
           }
         }
 
@@ -264,14 +278,14 @@ export default function OrbitalAvatar({
           try {
             resize()
           } catch {
-            disposeScene()
+            failScene()
           }
         }
         const handleVisibilityChange = () => {
           try {
             refreshLoop()
           } catch {
-            disposeScene()
+            failScene()
           }
         }
         const handlePointerMove = (event: PointerEvent) => {
@@ -291,7 +305,7 @@ export default function OrbitalAvatar({
             pointer.x = ((event.clientX - bounds.left) / width - 0.5) * 2
             pointer.y = ((event.clientY - bounds.top) / height - 0.5) * 2
           } catch {
-            disposeScene()
+            failScene()
           }
         }
         const handleReducedMotionChange = (event: MediaQueryListEvent) => {
@@ -300,7 +314,7 @@ export default function OrbitalAvatar({
             refreshLoop()
             if (prefersReducedMotion) renderFrame(0)
           } catch {
-            disposeScene()
+            failScene()
           }
         }
 
@@ -394,7 +408,7 @@ export default function OrbitalAvatar({
               intersectsViewport = entries.some((entry) => entry.isIntersecting)
               refreshLoop()
             } catch {
-              disposeScene()
+              failScene()
             }
           })
           intersectionObserver.observe(container)
@@ -406,7 +420,7 @@ export default function OrbitalAvatar({
         }
         refreshLoop()
       } catch {
-        disposeScene()
+        failScene()
       }
     }
 
