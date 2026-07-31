@@ -61,16 +61,21 @@ export default function HeroSection() {
         <div
           data-avatar-fallback
           data-state={orbitalReady ? 'ready' : 'loading'}
-          className={`avatar-glass-fallback absolute left-1/2 top-1/2 z-0 flex aspect-square w-[min(52vw,430px)] -translate-x-1/2 -translate-y-1/2 items-center justify-center transition-opacity duration-500 ${
+          className={`absolute left-1/2 top-1/2 z-0 aspect-square w-[min(52vw,430px)] -translate-x-1/2 -translate-y-1/2 transition-opacity duration-500 ${
             orbitalReady ? 'opacity-0' : 'opacity-100'
           }`}
         >
-          <img
-            src="/images/avatar-transparent.png"
-            alt="Erkan avatar"
-            className="relative z-10 max-h-full w-full object-contain"
-            loading="eager"
-          />
+          <div
+            data-avatar-fallback-motion
+            className="hero-avatar-fallback-motion relative isolate flex h-full w-full items-center justify-center"
+          >
+            <img
+              src="/images/avatar-transparent.png"
+              alt="Erkan avatar"
+              className="relative z-10 max-h-full w-full object-contain"
+              loading="eager"
+            />
+          </div>
         </div>
       </div>
     </section>

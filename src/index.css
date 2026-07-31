@@ -27,7 +27,7 @@ html, body, #root {
   background-clip: text;
 }
 
-@keyframes avatar-glass-drift {
+@keyframes hero-avatar-fallback-drift {
   0%, 100% {
     transform: translate3d(0, 0, 0) scale(1);
   }
@@ -37,13 +37,12 @@ html, body, #root {
   }
 }
 
-.avatar-glass-fallback {
-  isolation: isolate;
+.hero-avatar-fallback-motion {
   transform-origin: 50% 45%;
 }
 
-.avatar-glass-fallback::before,
-.avatar-glass-fallback::after {
+.hero-avatar-fallback-motion::before,
+.hero-avatar-fallback-motion::after {
   border-radius: 50%;
   content: '';
   inset: 8%;
@@ -52,7 +51,7 @@ html, body, #root {
   z-index: -1;
 }
 
-.avatar-glass-fallback::before {
+.hero-avatar-fallback-motion::before {
   background:
     radial-gradient(circle at 36% 28%, rgba(238, 210, 255, 0.22), transparent 24%),
     radial-gradient(circle at 50% 55%, rgba(168, 85, 247, 0.16), transparent 62%);
@@ -62,7 +61,7 @@ html, body, #root {
     0 0 34px rgba(168, 85, 247, 0.22);
 }
 
-.avatar-glass-fallback::after {
+.hero-avatar-fallback-motion::after {
   background: radial-gradient(circle, rgba(192, 132, 252, 0.25), transparent 64%);
   filter: blur(22px);
   opacity: 0.7;
@@ -70,19 +69,19 @@ html, body, #root {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .avatar-glass-fallback {
-    animation: avatar-glass-drift 7s ease-in-out infinite;
+  .hero-avatar-fallback-motion {
+    animation: hero-avatar-fallback-drift 7s ease-in-out infinite;
     will-change: transform;
   }
 }
 
-.avatar-glass-fallback[data-state='ready'] {
+[data-avatar-fallback][data-state='ready'] .hero-avatar-fallback-motion {
   animation: none;
   will-change: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .avatar-glass-fallback {
+  .hero-avatar-fallback-motion {
     animation: none;
   }
 }

@@ -55,6 +55,9 @@ describe('HeroSection', () => {
     expect(screen.getAllByTestId('orbital-ready')).toHaveLength(1)
     const avatar = screen.getByRole('img', { name: 'Erkan avatar' })
     const fallback = avatar.closest('[data-avatar-fallback]')
+    const fallbackMotion = fallback?.querySelector(
+      '[data-avatar-fallback-motion]',
+    )
     expect(fallback).toHaveClass(
       'absolute',
       'aspect-square',
@@ -64,6 +67,9 @@ describe('HeroSection', () => {
       '-translate-x-1/2',
       '-translate-y-1/2',
     )
+    expect(fallback).not.toHaveClass('hero-avatar-fallback-motion')
+    expect(fallbackMotion).toHaveClass('hero-avatar-fallback-motion')
+    expect(fallbackMotion).toContainElement(avatar)
     expect(avatar).toHaveClass('w-full', 'object-contain')
     expect(avatar).toHaveAttribute(
       'src',
