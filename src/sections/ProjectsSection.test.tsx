@@ -76,5 +76,26 @@ describe('ProjectsSection', () => {
     expect(
       within(firewallCard).queryByRole('link', { name: /open the live/i })
     ).not.toBeInTheDocument()
+
+    const contributionTitle = screen.getByRole('heading', {
+      name: 'GitHub Contributions',
+    })
+    const viewAllLink = screen.getByRole('link', {
+      name: 'View all projects on GitHub',
+    })
+    expect(viewAllLink).toHaveAttribute(
+      'href',
+      'https://github.com/erkanrzgc?tab=repositories'
+    )
+    expect(viewAllLink).toHaveAttribute('target', '_blank')
+    expect(viewAllLink).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(
+      projectList.compareDocumentPosition(contributionTitle) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(
+      contributionTitle.compareDocumentPosition(viewAllLink) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
   })
 })

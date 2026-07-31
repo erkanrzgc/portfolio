@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowUpRight, Github, Star } from 'lucide-react'
 import FadeIn from '../components/FadeIn'
+import GithubContributions from '../components/GithubContributions'
 import {
   fallbackProjects,
   fetchGithubProjects,
@@ -140,6 +141,20 @@ export default function ProjectsSection() {
           {projects.map((project) => (
             <ProjectCard key={project.name} project={project} />
           ))}
+        </div>
+
+        <GithubContributions />
+
+        <div className="mt-8 flex justify-center sm:mt-10">
+          <a
+            href="https://github.com/erkanrzgc?tab=repositories"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full border border-[#D7E2EA]/35 px-5 py-3 text-sm font-semibold text-[#D7E2EA] transition-colors hover:border-[#D7E2EA] hover:bg-[#D7E2EA]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D7E2EA] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0C]"
+          >
+            View all projects on GitHub
+            <ArrowUpRight aria-hidden="true" size={16} />
+          </a>
         </div>
       </div>
     </section>
