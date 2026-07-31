@@ -1,6 +1,9 @@
-import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fallbackProjects, fetchGithubProjects } from '../lib/githubProjects'
 import ProjectsSection from './ProjectsSection'
+
+afterEach(cleanup)
 
 vi.mock('../components/FadeIn', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -98,4 +101,30 @@ describe('ProjectsSection', () => {
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
   })
+
+  it('keeps the curated fallback order and reports a GitHub API failure', async () => {
+    vi.mocked(fetchGithubProjects).mockRejectedValueOnce(
+      new Error('GitHub API unavailable'),
+    )
+
+    render(<ProjectsSection />)
+
+    expect(
+      await screen.findByText(
+        'GitHub could not be reached, so the portfolio is showing a local fallback list.',
+      ),
+    ).toBeInTheDocument()
+
+    const cards = within(screen.getByRole('list')).getAllByRole('listitem')
+    expect(cards).toHaveLength(8)
+    expect(
+      cards.map((card) =>
+        within(card).getByRole('heading').textContent?.toLowerCase(),
+      ),
+    ).toEqual(fallbackProjects.map((project) => formatName(project.name)))
+  })
 })
+
+function formatName(name: string) {
+  return name.replace(/-/g, ' ')
+}
