@@ -13,7 +13,7 @@ describe('GithubContributions', () => {
     })
     expect(image).toHaveAttribute(
       'src',
-      'https://ghchart.rshah.org/BBCCD7/erkanrzgc'
+      'https://ghchart.rshah.org/39d353/erkanrzgc'
     )
     expect(image).toHaveAttribute('loading', 'lazy')
 
@@ -21,6 +21,16 @@ describe('GithubContributions', () => {
     expect(profileLink).toHaveAttribute('href', 'https://github.com/erkanrzgc')
     expect(profileLink).toHaveAttribute('target', '_blank')
     expect(profileLink).toHaveAttribute('rel', 'noopener noreferrer')
+
+    expect(screen.getByText('erkanrzgc · live activity')).toHaveClass(
+      'text-[#7EE787]'
+    )
+
+    expect(
+      screen
+        .getByRole('heading', { name: 'GitHub Contributions' })
+        .closest('section')
+    ).toHaveClass('border-[#39D353]/25')
   })
 
   it('replaces a broken chart with an accessible profile link', () => {
