@@ -80,8 +80,70 @@ html, body, #root {
   will-change: auto;
 }
 
+.spotlight-card {
+  --spotlight-x: 50%;
+  --spotlight-y: 50%;
+  background: rgba(126, 74, 173, 0.12);
+  border: 1px solid rgba(216, 180, 254, 0.16);
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+}
+
+.spotlight-card::before {
+  background: radial-gradient(260px circle at var(--spotlight-x) var(--spotlight-y), rgba(192, 132, 252, 0.26), transparent 68%);
+  content: '';
+  inset: 0;
+  opacity: 0.45;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 180ms ease;
+  z-index: 0;
+}
+
+.spotlight-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.spotlight-card:focus-within {
+  border-color: rgba(216, 180, 254, 0.58);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.18);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .spotlight-card {
+    background: rgba(34, 22, 50, 0.72);
+    transform: perspective(900px) translateY(0);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .spotlight-card:hover {
+    border-color: rgba(216, 180, 254, 0.38);
+    box-shadow: 0 16px 36px rgba(10, 5, 20, 0.24);
+    transform: perspective(900px) translateY(-3px);
+  }
+
+  .spotlight-card:hover::before,
+  .spotlight-card:focus-within::before {
+    opacity: 1;
+  }
+}
+
+@media (pointer: coarse) {
+  .spotlight-card {
+    background: linear-gradient(145deg, rgba(126, 74, 173, 0.17), rgba(34, 22, 50, 0.78));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-avatar-fallback-motion {
     animation: none;
+  }
+
+  .spotlight-card,
+  .spotlight-card::before {
+    transform: none;
+    transition: none;
   }
 }
