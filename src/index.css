@@ -27,29 +27,57 @@ html, body, #root {
   background-clip: text;
 }
 
-@keyframes mobile-avatar-float {
+@keyframes avatar-glass-drift {
   0%, 100% {
-    transform: translate3d(0, 0, 0) rotate(-0.25deg) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 
   50% {
-    transform: translate3d(0, -12px, 0) rotate(0.25deg) scale(1.012);
+    transform: translate3d(0, -7px, 0) scale(1.008);
   }
 }
 
-.hero-avatar-float {
+.avatar-glass-fallback {
+  isolation: isolate;
   transform-origin: 50% 45%;
 }
 
-@media (hover: none), (pointer: coarse) {
-  .hero-avatar-float {
-    animation: mobile-avatar-float 5.5s ease-in-out infinite;
+.avatar-glass-fallback::before,
+.avatar-glass-fallback::after {
+  border-radius: 50%;
+  content: '';
+  inset: 8%;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+.avatar-glass-fallback::before {
+  background:
+    radial-gradient(circle at 36% 28%, rgba(238, 210, 255, 0.22), transparent 24%),
+    radial-gradient(circle at 50% 55%, rgba(168, 85, 247, 0.16), transparent 62%);
+  border: 1px solid rgba(224, 191, 255, 0.35);
+  box-shadow:
+    inset 0 0 32px rgba(210, 155, 255, 0.12),
+    0 0 34px rgba(168, 85, 247, 0.22);
+}
+
+.avatar-glass-fallback::after {
+  background: radial-gradient(circle, rgba(192, 132, 252, 0.25), transparent 64%);
+  filter: blur(22px);
+  opacity: 0.7;
+  transform: scale(1.08);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .avatar-glass-fallback {
+    animation: avatar-glass-drift 7s ease-in-out infinite;
     will-change: transform;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-avatar-float {
+  .avatar-glass-fallback {
     animation: none;
   }
 }

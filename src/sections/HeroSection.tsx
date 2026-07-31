@@ -1,15 +1,15 @@
+import { useState } from 'react'
 import FadeIn from '../components/FadeIn'
-import Magnet from '../components/Magnet'
-import NetworkGlobe from '../components/NetworkGlobe'
+import OrbitalAvatar from '../components/OrbitalAvatar'
 import { CONTACT_SECTION_HREF } from '../lib/contactLinks'
 
 const navLinks = ['About', 'Services', 'Projects', 'Contact']
 
 export default function HeroSection() {
+  const [orbitalReady, setOrbitalReady] = useState(false)
+
   return (
     <section className="relative flex h-screen flex-col overflow-x-clip bg-[#0C0C0C]">
-      <NetworkGlobe className="absolute left-1/2 top-[58%] z-0 h-[min(78vw,760px)] w-[min(92vw,920px)] -translate-x-1/2 -translate-y-1/2 opacity-90" />
-
       {/* Navbar */}
       <FadeIn delay={0} y={-20} className="relative z-20">
         <nav className="flex justify-between px-6 pt-6 md:px-10 md:pt-8">
@@ -52,19 +52,24 @@ export default function HeroSection() {
       </FadeIn>
 
       {/* Hero Portrait */}
-      <div className="absolute left-1/2 top-[62%] z-10 w-[320px] -translate-x-1/2 -translate-y-1/2 sm:top-[64%] sm:w-[430px] md:w-[520px] lg:w-[610px] xl:w-[660px]">
-        <FadeIn delay={0.6} y={30} className="w-full">
-          <Magnet padding={360} strength={1.65} className="hero-avatar-magnet">
-            <div className="hero-avatar-float">
-              <img
-                src="/images/avatar-transparent.png"
-                alt="Erkan avatar"
-                className="w-full object-contain"
-                loading="eager"
-              />
-            </div>
-          </Magnet>
-        </FadeIn>
+      <div className="absolute left-1/2 top-[62%] z-10 h-[min(92vw,780px)] w-[min(96vw,980px)] -translate-x-1/2 -translate-y-1/2 sm:top-[64%]">
+        <OrbitalAvatar
+          className="absolute inset-0 z-10"
+          onReady={() => setOrbitalReady(true)}
+        />
+        <div
+          data-avatar-fallback
+          className={`avatar-glass-fallback absolute inset-0 z-0 flex items-center justify-center transition-opacity duration-500 ${
+            orbitalReady ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <img
+            src="/images/avatar-transparent.png"
+            alt="Erkan avatar"
+            className="relative z-10 h-full w-full object-contain"
+            loading="eager"
+          />
+        </div>
       </div>
     </section>
   )
