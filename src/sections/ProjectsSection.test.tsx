@@ -80,6 +80,14 @@ describe('ProjectsSection', () => {
       within(firewallCard).queryByRole('link', { name: /open the live/i })
     ).not.toBeInTheDocument()
 
+    const autonomousScannerCard = cards[2]
+    expect(
+      within(autonomousScannerCard).getByText('1 star')
+    ).toBeInTheDocument()
+    expect(
+      within(autonomousScannerCard).queryByText('1 stars')
+    ).not.toBeInTheDocument()
+
     const contributionTitle = screen.getByRole('heading', {
       name: 'GitHub Contributions',
     })
@@ -109,11 +117,9 @@ describe('ProjectsSection', () => {
 
     render(<ProjectsSection />)
 
-    expect(
-      await screen.findByText(
-        'GitHub could not be reached, so the portfolio is showing a local fallback list.',
-      ),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'GitHub could not be reached, so the portfolio is showing a local fallback list.',
+    )
 
     const cards = within(screen.getByRole('list')).getAllByRole('listitem')
     expect(cards).toHaveLength(8)

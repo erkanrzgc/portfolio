@@ -52,7 +52,7 @@ function ProjectCard({ project }: { project: PortfolioProject }) {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Star aria-hidden="true" size={14} />
-            {project.stars} stars
+            {project.stars} {project.stars === 1 ? 'star' : 'stars'}
           </span>
           <span>Updated {formatUpdatedAt(project.updatedAt)}</span>
         </div>
@@ -131,7 +131,10 @@ export default function ProjectsSection() {
         </FadeIn>
 
         {status === 'error' && (
-          <p className="mb-8 max-w-2xl rounded-[20px] border border-[#D7E2EA]/20 bg-[#D7E2EA]/5 px-5 py-4 text-sm text-[#D7E2EA]/70">
+          <p
+            role="status"
+            className="mb-8 max-w-2xl rounded-[20px] border border-[#D7E2EA]/20 bg-[#D7E2EA]/5 px-5 py-4 text-sm text-[#D7E2EA]/70"
+          >
             GitHub could not be reached, so the portfolio is showing a local
             fallback list.
           </p>
