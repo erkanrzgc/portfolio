@@ -1,5 +1,6 @@
 import FadeIn from '../components/FadeIn'
 import Magnet from '../components/Magnet'
+import NetworkGlobe from '../components/NetworkGlobe'
 import { CONTACT_SECTION_HREF } from '../lib/contactLinks'
 
 const navLinks = ['About', 'Services', 'Projects', 'Contact']
@@ -7,8 +8,10 @@ const navLinks = ['About', 'Services', 'Projects', 'Contact']
 export default function HeroSection() {
   return (
     <section className="relative flex h-screen flex-col overflow-x-clip bg-[#0C0C0C]">
+      <NetworkGlobe className="absolute left-1/2 top-[58%] z-0 h-[min(78vw,760px)] w-[min(92vw,920px)] -translate-x-1/2 -translate-y-1/2 opacity-90" />
+
       {/* Navbar */}
-      <FadeIn delay={0} y={-20}>
+      <FadeIn delay={0} y={-20} className="relative z-20">
         <nav className="flex justify-between px-6 pt-6 md:px-10 md:pt-8">
           {navLinks.map((link) =>
             link === 'Contact' ? (
@@ -33,7 +36,7 @@ export default function HeroSection() {
       </FadeIn>
 
       {/* Hero Heading */}
-      <div className="overflow-hidden">
+      <div className="relative z-20 overflow-hidden">
         <FadeIn delay={0.15} y={40}>
           <h1 className="hero-heading mt-6 w-full whitespace-nowrap text-center text-[11vw] font-black uppercase leading-none tracking-tight sm:mt-4 sm:text-[12vw] md:-mt-5 md:text-[13vw] lg:text-[14vw]">
             Hi, i&apos;m erkan
@@ -42,7 +45,7 @@ export default function HeroSection() {
       </div>
 
       {/* Subtitle */}
-      <FadeIn delay={0.25} y={20}>
+      <FadeIn delay={0.25} y={20} className="relative z-20">
         <p className="-mt-1 text-center text-[clamp(0.8rem,2vw,1.8rem)] font-light uppercase tracking-[0.25em] text-[#BBCCD7] sm:-mt-2 md:-mt-3">
           Software Engineer &amp; Cybersecurity Enthusiast
         </p>
