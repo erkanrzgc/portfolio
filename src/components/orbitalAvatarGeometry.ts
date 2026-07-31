@@ -1,11 +1,11 @@
 export interface OrbitDefinition {
-  radiusX: number
-  radiusY: number
-  rotation: readonly [number, number, number]
-  speed: number
-  phase: number
-  direction: 1 | -1
-  color: number
+  readonly radiusX: number
+  readonly radiusY: number
+  readonly rotation: readonly [number, number, number]
+  readonly speed: number
+  readonly phase: number
+  readonly direction: 1 | -1
+  readonly color: number
 }
 
 const ORBITS: readonly OrbitDefinition[] = [
