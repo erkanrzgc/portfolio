@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createConnectionSegments,
   createSpherePoints,
+  type GlobePoint,
 } from './networkGlobeGeometry'
 
 describe('createSpherePoints', () => {
@@ -19,19 +20,36 @@ describe('createSpherePoints', () => {
 })
 
 describe('createConnectionSegments', () => {
-  it('creates a bounded set of connection endpoint coordinates', () => {
-    const points = createSpherePoints(48, 1.6)
-    const segments = createConnectionSegments(points, 0.9, 80)
+  const points: GlobePoint[] = [
+    { x: 0, y: 0, z: 0 },
+    { x: 0.5, y: 0, z: 0 },
+    { x: 0, y: 0.5, z: 0 },
+    { x: 10, y: 0, z: 0 },
+  ]
+
+  it('emits only nearby pairs in deterministic iteration order', () => {
+    const segments = createConnectionSegments(points, 0.8, 80)
 
     expect(segments).toBeInstanceOf(Float32Array)
-    expect(segments.length).toBeGreaterThan(0)
-    expect(segments.length % 6).toBe(0)
-    expect(segments.length / 6).toBeLessThanOrEqual(80)
+    expect(segments).toEqual(
+      new Float32Array([
+        0, 0, 0, 0.5, 0, 0,
+        0, 0, 0, 0, 0.5, 0,
+        0.5, 0, 0, 0, 0.5, 0,
+      ]),
+    )
+  })
+
+  it('stops at the maximum connection count', () => {
+    expect(createConnectionSegments(points, 0.8, 2)).toEqual(
+      new Float32Array([
+        0, 0, 0, 0.5, 0, 0,
+        0, 0, 0, 0, 0.5, 0,
+      ]),
+    )
   })
 
   it('returns no connections when the maximum is zero', () => {
-    const points = createSpherePoints(2, 1.6)
-
     expect(createConnectionSegments(points, 4, 0)).toHaveLength(0)
   })
 })
