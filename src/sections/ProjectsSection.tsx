@@ -51,9 +51,9 @@ function ProjectCard({ project }: { project: PortfolioProject }) {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Star aria-hidden="true" size={14} />
-            {project.stars}
+            {project.stars} stars
           </span>
-          <span>{formatUpdatedAt(project.updatedAt)}</span>
+          <span>Updated {formatUpdatedAt(project.updatedAt)}</span>
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">

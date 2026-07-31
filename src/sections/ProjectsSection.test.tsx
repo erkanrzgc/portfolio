@@ -1,7 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import ProjectsSection from './ProjectsSection'
-import { fallbackProjects, formatRepoName } from '../lib/githubProjects'
 
 vi.mock('../components/FadeIn', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -29,22 +28,53 @@ describe('ProjectsSection', () => {
       cards.map((card) =>
         within(card).getByRole('heading').textContent?.toLowerCase()
       )
-    ).toEqual(
-      fallbackProjects.map((project) => formatRepoName(project.name))
-    )
+    ).toEqual([
+      'vibeprint',
+      'octopus',
+      'autonomous scanner',
+      'firewall',
+      'reverse engineering',
+      'steganography',
+      'loadkit',
+      'open source intelligence',
+    ])
 
     const vibeprintCard = cards[0]
     expect(vibeprintCard.tagName).toBe('ARTICLE')
+    expect(within(vibeprintCard).getByText('0 stars')).toBeInTheDocument()
     expect(
-      within(vibeprintCard).getByRole('link', {
-        name: 'Open vibeprint on GitHub',
-      })
+      within(vibeprintCard).getByText('Updated Jul 31, 2026')
     ).toBeInTheDocument()
-    expect(
-      within(vibeprintCard).getByRole('link', {
-        name: 'Open the live vibeprint project',
-      })
-    ).toBeInTheDocument()
+
+    const githubLink = within(vibeprintCard).getByRole('link', {
+      name: 'Open vibeprint on GitHub',
+    })
+    expect(githubLink).toHaveAttribute(
+      'href',
+      'https://github.com/erkanrzgc/vibeprint'
+    )
+    expect(githubLink).toHaveAttribute('target', '_blank')
+    expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer')
+
+    const liveLink = within(vibeprintCard).getByRole('link', {
+      name: 'Open the live vibeprint project',
+    })
+    expect(liveLink).toHaveAttribute(
+      'href',
+      'https://erkanrzgc.github.io/vibeprint/'
+    )
+    expect(liveLink).toHaveAttribute('target', '_blank')
+    expect(liveLink).toHaveAttribute('rel', 'noopener noreferrer')
     expect(vibeprintCard.closest('a')).toBeNull()
+
+    const firewallCard = cards[3]
+    expect(
+      within(firewallCard).getByRole('link', {
+        name: 'Open firewall on GitHub',
+      })
+    ).toBeInTheDocument()
+    expect(
+      within(firewallCard).queryByRole('link', { name: /open the live/i })
+    ).not.toBeInTheDocument()
   })
 })
