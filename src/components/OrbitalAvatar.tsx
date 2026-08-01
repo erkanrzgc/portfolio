@@ -586,6 +586,16 @@ export default function OrbitalAvatar({
         const handleReducedMotionChange = (event: MediaQueryListEvent) => {
           try {
             prefersReducedMotion = event.matches
+            if (prefersReducedMotion) {
+              motionState = createOrbitalMotionState()
+              pointer.x = 0
+              pointer.y = 0
+              dragDeltaX = 0
+              dragDeltaY = 0
+              dragging = false
+              cancelMomentum = false
+              resetFrameClock()
+            }
             syncPointerListener()
             refreshLoop()
             if (prefersReducedMotion) renderFrame(0)

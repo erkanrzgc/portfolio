@@ -52,6 +52,7 @@ const three = vi.hoisted(() => {
       dispose: ReturnType<typeof vi.fn>
       opacity: number
       options: Record<string, unknown>
+      rotation: number
     }>,
     lines: [] as Array<{
       geometry: {
@@ -131,7 +132,11 @@ const three = vi.hoisted(() => {
       widthSegments: number
     }>,
     sprites: [] as Array<{
-      material: { opacity: number; options: Record<string, unknown> }
+      material: {
+        opacity: number
+        options: Record<string, unknown>
+        rotation: number
+      }
       position: {
         x: number
         y: number
@@ -335,7 +340,11 @@ vi.mock('three', () => {
       scale = createScale()
 
       constructor(
-        public material: { opacity: number; options: Record<string, unknown> },
+        public material: {
+          opacity: number
+          options: Record<string, unknown>
+          rotation: number
+        },
       ) {
         three.sprites.push(this)
       }
@@ -1309,6 +1318,92 @@ describe('OrbitalAvatar', () => {
         1,
       )
     })
+  })
+
+  it('resets active motion when reduced motion is enabled and resumes from neutral', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    vi.spyOn(wrapper, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600,
+      height: 400,
+      left: 100,
+      right: 700,
+      top: 200,
+      width: 600,
+      x: 100,
+      y: 200,
+      toJSON: () => undefined,
+    })
+    const interactionRig = getGroup('interactionRig')
+    const avatarRig = getGroup('avatarRig')
+    const glowGroup = getGroup('glowGroup')
+    const avatarMaterial = three.sprites[2].material
+    const initialGlowRotation = { ...glowGroup.rotation }
+
+    runNextFrame(browser, 1000)
+    act(() =>
+      window.dispatchEvent(
+        new MouseEvent('pointermove', { clientX: 700, clientY: 400 }),
+      ),
+    )
+    runNextFrame(browser, 1016)
+    expect(interactionRig.rotation.y).not.toBe(0)
+    expect(avatarRig.position.x).not.toBe(0)
+    expect(avatarMaterial.rotation).not.toBe(0)
+
+    const reducedMotionMedia = browser.media.get(
+      '(prefers-reduced-motion: reduce)',
+    )!
+    const reducedMotionHandler =
+      reducedMotionMedia.addEventListener.mock.calls.find(
+        ([type]) => type === 'change',
+      )?.[1] as EventListener
+    reducedMotionMedia.matches = true
+    act(() =>
+      reducedMotionHandler({ matches: true } as unknown as MediaQueryListEvent),
+    )
+
+    expect(browser.pendingFrames).toHaveLength(0)
+    expect(interactionRig.rotation.x).toBe(0.04)
+    expect(interactionRig.rotation.y).toBe(0)
+    expect(avatarRig.position.x).toBe(0)
+    expect(avatarRig.position.y).toBe(0)
+    expect(avatarRig.scale.setScalar).toHaveBeenLastCalledWith(1)
+    expect(avatarMaterial.rotation).toBe(0)
+    expect(glowGroup.position.x).toBe(0)
+    expect(glowGroup.position.y).toBe(0)
+    expect(glowGroup.rotation).toEqual(initialGlowRotation)
+
+    const scheduledFrames = browser.requestAnimationFrame.mock.calls.length
+    reducedMotionMedia.matches = false
+    act(() =>
+      reducedMotionHandler({ matches: false } as unknown as MediaQueryListEvent),
+    )
+
+    expect(browser.requestAnimationFrame).toHaveBeenCalledTimes(
+      scheduledFrames + 1,
+    )
+    expect(browser.pendingFrames).toHaveLength(1)
+    runNextFrame(browser, 10000)
+    expect(interactionRig.rotation.x).toBe(0.04)
+    expect(interactionRig.rotation.y).toBe(0)
+    expect(avatarRig.position.x).toBe(0)
+    expect(avatarRig.position.y).toBe(0)
+    expect(avatarMaterial.rotation).toBe(0)
+
+    runNextFrame(browser, 10016)
+    expect(interactionRig.rotation.x).toBe(0.04)
+    expect(interactionRig.rotation.y).toBeCloseTo(0.016 * 0.025, 12)
+    expect(avatarRig.position.x).toBe(0)
+    expect(avatarRig.position.y).toBe(0)
+    expect(avatarMaterial.rotation).toBe(0)
+    expect(glowGroup.position.x).toBe(0)
+    expect(glowGroup.position.y).toBe(0)
+    expect(glowGroup.rotation).toEqual(initialGlowRotation)
+    expect(browser.pendingFrames).toHaveLength(1)
   })
 
   it('redraws the stable reduced-motion frame after resize', async () => {
