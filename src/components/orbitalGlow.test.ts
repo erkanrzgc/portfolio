@@ -13,6 +13,7 @@ describe('orbital glow model', () => {
     expect(texture).toHaveLength(size * size * 4)
     expect(alphaAt(2, 2)).toBe(255)
     expect(alphaAt(0, 0)).toBe(0)
+    expect(alphaAt(3, 2)).toBe(48)
     expect(alphaAt(3, 2)).toBeGreaterThan(0)
     expect(alphaAt(3, 2)).toBeLessThan(255)
 
@@ -26,9 +27,24 @@ describe('orbital glow model', () => {
 
   it('defines two low-opacity glow layers with distinct pulses', () => {
     expect(GLOW_LAYERS).toHaveLength(2)
+    expect(Object.isFrozen(GLOW_LAYERS[0].scale)).toBe(true)
+    expect(Object.isFrozen(GLOW_LAYERS[1].scale)).toBe(true)
     expect(GLOW_LAYERS.every((layer) => layer.opacity < 0.25)).toBe(true)
     expect(GLOW_LAYERS[1].scale[0]).toBeGreaterThan(GLOW_LAYERS[0].scale[0])
     expect(GLOW_LAYERS[1].scale[1]).toBeGreaterThan(GLOW_LAYERS[0].scale[1])
     expect(GLOW_LAYERS[1].pulseOffset).not.toBe(GLOW_LAYERS[0].pulseOffset)
+  })
+
+  it.each([
+    ['NaN', Number.NaN, 128],
+    ['positive infinity', Number.POSITIVE_INFINITY, 128],
+    ['negative infinity', Number.NEGATIVE_INFINITY, 128],
+    ['negative size', -4, 2],
+    ['fractional size', 5.9, 5],
+    ['excessive size', 900, 512],
+  ])('normalizes %s texture sizes safely', (_, requestedSize, dimension) => {
+    expect(createRadialGlowTextureData(requestedSize)).toHaveLength(
+      dimension * dimension * 4,
+    )
   })
 })

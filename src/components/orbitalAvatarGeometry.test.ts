@@ -38,11 +38,15 @@ describe('orbital avatar geometry', () => {
     })
     expect(tablet).toMatchObject({
       allowPointerParallax: true,
+      glowIntensity: 0.84,
+      glowScale: 0.92,
       orbitCount: 8,
       tier: 'tablet',
     })
     expect(mobile).toMatchObject({
       allowPointerParallax: false,
+      glowIntensity: 0.7,
+      glowScale: 0.84,
       orbitCount: 5,
       tier: 'mobile',
     })

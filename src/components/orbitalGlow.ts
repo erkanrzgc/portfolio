@@ -1,5 +1,7 @@
 export const GLOW_TEXTURE_SIZE = 128
 
+const MAX_GLOW_TEXTURE_SIZE = 512
+
 export interface GlowLayerDefinition {
   readonly color: number
   readonly opacity: number
@@ -13,14 +15,14 @@ export const GLOW_LAYERS: readonly GlowLayerDefinition[] = Object.freeze([
     color: 0xa855f7,
     opacity: 0.2,
     pulseOffset: 0,
-    scale: [2.85, 2.38] as const,
+    scale: Object.freeze([2.85, 2.38] as const),
     z: -0.42,
   }),
   Object.freeze({
     color: 0x7e22ce,
     opacity: 0.11,
     pulseOffset: Math.PI,
-    scale: [3.5, 2.88] as const,
+    scale: Object.freeze([3.5, 2.88] as const),
     z: -0.58,
   }),
 ])
@@ -28,7 +30,9 @@ export const GLOW_LAYERS: readonly GlowLayerDefinition[] = Object.freeze([
 export function createRadialGlowTextureData(
   size = GLOW_TEXTURE_SIZE,
 ): Uint8Array {
-  const dimension = Math.max(2, Math.floor(size))
+  const dimension = Number.isFinite(size)
+    ? Math.min(MAX_GLOW_TEXTURE_SIZE, Math.max(2, Math.floor(size)))
+    : GLOW_TEXTURE_SIZE
   const data = new Uint8Array(dimension * dimension * 4)
   const center = (dimension - 1) / 2
   const radius = Math.max(1, center)
