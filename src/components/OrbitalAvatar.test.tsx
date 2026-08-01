@@ -531,17 +531,19 @@ function runNextFrame(browser: ControlledBrowser, time: number) {
 function createPointerEvent(
   type: string,
   {
+    button = 0,
     clientX = 0,
     clientY = 0,
     isPrimary = true,
     pointerId = 1,
     pointerType = 'mouse',
   }: Partial<Pick<PointerEvent,
-    'clientX' | 'clientY' | 'isPrimary' | 'pointerId' | 'pointerType'
+    'button' | 'clientX' | 'clientY' | 'isPrimary' | 'pointerId' | 'pointerType'
   >> = {},
 ) {
   const event = new Event(type, { bubbles: true, cancelable: true })
   Object.defineProperties(event, {
+    button: { value: button },
     clientX: { value: clientX },
     clientY: { value: clientY },
     isPrimary: { value: isPrimary },
@@ -789,6 +791,45 @@ describe('OrbitalAvatar', () => {
     expect(glowGroup.position.y).toBe(avatarRig.position.y)
     expect(glowGroup.rotation).toEqual(initialGlowRotation)
     expect(browser.pendingFrames).toHaveLength(1)
+  })
+
+  it.each([
+    { button: 1, label: 'middle' },
+    { button: 2, label: 'right' },
+  ])('ignores $label mouse pointerdown', async ({ button }) => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    mockWrapperBounds(wrapper)
+    const capture = installPointerCapture(wrapper)
+    const interactionRig = getGroup('interactionRig')
+    runNextFrame(browser, 1000)
+    const initialYaw = interactionRig.rotation.y
+
+    act(() => wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+      button,
+      clientX: 400,
+      clientY: 400,
+      pointerId: 50 + button,
+      pointerType: 'mouse',
+    })))
+
+    expect(capture.setPointerCapture).not.toHaveBeenCalled()
+    expect(wrapper.style.cursor).toBe('grab')
+    runNextFrame(browser, 1016)
+    expect(interactionRig.rotation.x).toBe(0.04)
+    expect(interactionRig.rotation.y - initialYaw).toBeCloseTo(
+      0.016 * 0.025,
+      12,
+    )
+
+    act(() => wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+      pointerId: 60 + button,
+      pointerType: 'mouse',
+    })))
+    expect(capture.setPointerCapture).toHaveBeenCalledWith(60 + button)
   })
 
   it('preserves a fine-pointer flick released before the next frame', async () => {

@@ -611,7 +611,12 @@ export default function OrbitalAvatar({
           }
         }
         const handlePointerDown = (event: PointerEvent) => {
-          if (!canInteract() || !event.isPrimary || activeDrag) return
+          if (
+            !canInteract() ||
+            !event.isPrimary ||
+            event.button !== 0 ||
+            activeDrag
+          ) return
 
           const coarsePointer =
             coarsePointerQuery.matches || event.pointerType === 'touch'
@@ -712,7 +717,9 @@ export default function OrbitalAvatar({
             pointer.y = 0
           }
         }
-        const interactionHandlers: Array<readonly [string, EventListener]> = [
+        const interactionHandlers: ReadonlyArray<
+          readonly [keyof HTMLElementEventMap, EventListener]
+        > = [
           ['pointerdown', handlePointerDown as EventListener],
           ['pointermove', handlePointerMove as EventListener],
           ['pointerup', handlePointerUp as EventListener],
