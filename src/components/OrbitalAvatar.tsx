@@ -8,6 +8,11 @@ import {
   getOrbitalSceneProfile,
   type OrbitalSceneProfile,
 } from './orbitalAvatarGeometry'
+import {
+  GLOW_LAYERS,
+  GLOW_TEXTURE_SIZE,
+  createRadialGlowTextureData,
+} from './orbitalGlow'
 
 export interface OrbitalAvatarProps {
   className?: string
@@ -58,12 +63,12 @@ export default function OrbitalAvatar({
       let frameId: number | null = null
       let resizeObserver: ResizeObserver | null = null
       let intersectionObserver: IntersectionObserver | null = null
-      let texture: import('three').Texture | null = null
       let renderer: import('three').WebGLRenderer | null = null
       let sceneReady = false
       let unavailableSignalled = false
       const geometries: Array<{ dispose: () => void }> = []
       const materials: Array<{ dispose: () => void }> = []
+      const textures: Array<{ dispose: () => void }> = []
       const removeListeners: Array<() => void> = []
       const disposeSafely = (action: () => void) => {
         try {
@@ -111,7 +116,9 @@ export default function OrbitalAvatar({
           disposeSafely(() => resizeObserver?.disconnect())
           disposeSafely(() => intersectionObserver?.disconnect())
           removeListeners.splice(0).forEach(disposeSafely)
-          if (texture) disposeSafely(() => texture?.dispose())
+          textures.splice(0).forEach((texture) =>
+            disposeSafely(() => texture.dispose()),
+          )
           geometries.forEach((geometry) =>
             disposeSafely(() => geometry.dispose()),
           )
@@ -144,7 +151,7 @@ export default function OrbitalAvatar({
         const coreMaterial = new THREE.MeshBasicMaterial({
           color: 0xa855f7,
           depthWrite: false,
-          opacity: 0.09,
+          opacity: 0.003,
           transparent: true,
         })
         materials.push(coreMaterial)
@@ -161,7 +168,7 @@ export default function OrbitalAvatar({
           blending: THREE.AdditiveBlending,
           color: 0xa855f7,
           depthWrite: false,
-          opacity: 0.055,
+          opacity: 0.004,
           side: THREE.BackSide,
           transparent: true,
         })
@@ -171,6 +178,36 @@ export default function OrbitalAvatar({
           atmosphereMaterial,
         )
         root.add(atmosphere)
+
+        const glowTexture = new THREE.DataTexture(
+          createRadialGlowTextureData(),
+          GLOW_TEXTURE_SIZE,
+          GLOW_TEXTURE_SIZE,
+          THREE.RGBAFormat,
+        )
+        glowTexture.needsUpdate = true
+        glowTexture.magFilter = THREE.LinearFilter
+        glowTexture.minFilter = THREE.LinearFilter
+        glowTexture.generateMipmaps = false
+        textures.push(glowTexture)
+
+        const glowActors = GLOW_LAYERS.map((definition) => {
+          const material = new THREE.SpriteMaterial({
+            blending: THREE.AdditiveBlending,
+            color: definition.color,
+            depthTest: true,
+            depthWrite: false,
+            map: glowTexture,
+            opacity: definition.opacity,
+            transparent: true,
+          })
+          materials.push(material)
+          const sprite = new THREE.Sprite(material)
+          sprite.position.set(0, 0, definition.z)
+          sprite.renderOrder = 0
+          root.add(sprite)
+          return { definition, material, sprite }
+        })
 
         const orbits = getOrbitDefinitions(false)
         const orbitActors = orbits.map((orbit) => {
@@ -265,6 +302,14 @@ export default function OrbitalAvatar({
           activeProfile = nextProfile
 
           orbitalGroup.scale.setScalar(activeProfile.orbitScale)
+          glowActors.forEach(({ definition, material, sprite }) => {
+            material.opacity = definition.opacity * activeProfile.glowIntensity
+            sprite.scale.set(
+              definition.scale[0] * activeProfile.glowScale,
+              definition.scale[1] * activeProfile.glowScale,
+              1,
+            )
+          })
           orbitActors.forEach((actor, index) => {
             const visible = index < activeProfile.orbitCount
             actor.line.visible = visible
@@ -322,9 +367,17 @@ export default function OrbitalAvatar({
             mesh.position.set(x, y, z)
           })
 
-          atmosphere.scale.setScalar(
-            1 + Math.sin(animationTime * 0.0007) * 0.022,
-          )
+          atmosphere.scale.setScalar(1)
+          glowActors.forEach(({ definition, sprite }) => {
+            const breath = 1 + Math.sin(
+              animationTime * 0.00045 + definition.pulseOffset,
+            ) * 0.018
+            sprite.scale.set(
+              definition.scale[0] * activeProfile.glowScale * breath,
+              definition.scale[1] * activeProfile.glowScale * breath,
+              1,
+            )
+          })
           particleField.rotation.x = animationTime * 0.000006
           particleField.rotation.y = animationTime * -0.000012
 
@@ -479,26 +532,23 @@ export default function OrbitalAvatar({
 
         const loadedTexture = await new Promise<import('three').Texture>(
           (resolve, reject) => {
-            texture = new THREE.TextureLoader().load(
+            const requestedTexture = new THREE.TextureLoader().load(
               AVATAR_TEXTURE,
               resolve,
               undefined,
               reject,
             )
+            textures.push(requestedTexture)
           },
         )
-        if (cancelled || disposed) {
-          if (texture !== loadedTexture) loadedTexture.dispose()
-          return
-        }
-        texture = loadedTexture
+        if (cancelled || disposed) return
         loadedTexture.colorSpace = THREE.SRGBColorSpace
 
         const avatarMaterial = new THREE.SpriteMaterial({
           alphaTest: 0.02,
           depthTest: true,
           depthWrite: true,
-          map: texture,
+          map: loadedTexture,
           transparent: true,
         })
         materials.push(avatarMaterial)

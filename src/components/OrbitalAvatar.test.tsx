@@ -20,6 +20,16 @@ const three = vi.hoisted(() => {
       colorSpace?: unknown
       dispose: ReturnType<typeof vi.fn>
     }>,
+    dataTextures: [] as Array<{
+      data: Uint8Array
+      width: number
+      height: number
+      dispose: ReturnType<typeof vi.fn>
+      needsUpdate: boolean
+      magFilter?: unknown
+      minFilter?: unknown
+      generateMipmaps: boolean
+    }>,
     geometries: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,
     bufferGeometries: [] as Array<{
       attributes: Record<string, unknown>
@@ -29,6 +39,7 @@ const three = vi.hoisted(() => {
     }>,
     materials: [] as Array<{
       dispose: ReturnType<typeof vi.fn>
+      opacity: number
       options: Record<string, unknown>
     }>,
     lines: [] as Array<{
@@ -65,7 +76,9 @@ const three = vi.hoisted(() => {
       widthSegments: number
     }>,
     sprites: [] as Array<{
-      material: { options: Record<string, unknown> }
+      material: { opacity: number; options: Record<string, unknown> }
+      position: { set: ReturnType<typeof vi.fn> }
+      scale: { set: ReturnType<typeof vi.fn> }
       renderOrder: number
     }>,
   }
@@ -97,8 +110,10 @@ vi.mock('three', () => {
 
   class DisposableMaterial {
     dispose = vi.fn()
+    opacity: number
 
     constructor(public options: Record<string, unknown> = {}) {
+      this.opacity = (options.opacity as number | undefined) ?? 1
       three.materials.push(this)
     }
   }
@@ -109,6 +124,22 @@ vi.mock('three', () => {
     AdditiveBlending: 2,
     BackSide: 1,
     BufferGeometry,
+    DataTexture: class {
+      dispose = vi.fn()
+      needsUpdate = false
+      magFilter?: unknown
+      minFilter?: unknown
+      generateMipmaps = true
+
+      constructor(
+        public data: Uint8Array,
+        public width: number,
+        public height: number,
+        public format: unknown,
+      ) {
+        three.dataTextures.push(this)
+      }
+    },
     Float32BufferAttribute: class {
       needsUpdate = false
 
@@ -117,6 +148,7 @@ vi.mock('three', () => {
         public itemSize: number,
       ) {}
     },
+    LinearFilter: 'linear',
     Group: class {
       add = vi.fn()
       rotation = { x: 0, y: 0, z: 0 }
@@ -193,11 +225,14 @@ vi.mock('three', () => {
       renderOrder = 0
       scale = { set: vi.fn() }
 
-      constructor(public material: { options: Record<string, unknown> }) {
+      constructor(
+        public material: { opacity: number; options: Record<string, unknown> },
+      ) {
         three.sprites.push(this)
       }
     },
     SpriteMaterial: DisposableMaterial,
+    RGBAFormat: 'rgba',
     SRGBColorSpace: 'srgb',
     TextureLoader: class {
       load(
@@ -364,6 +399,7 @@ beforeEach(() => {
   three.textureResult = 'success'
   three.renderers.length = 0
   three.textures.length = 0
+  three.dataTextures.length = 0
   three.geometries.length = 0
   three.bufferGeometries.length = 0
   three.materials.length = 0
@@ -461,6 +497,59 @@ describe('OrbitalAvatar', () => {
     expect(browser.pendingFrames).toHaveLength(1)
   })
 
+  it('renders two glow sprites before the avatar sprite', async () => {
+    installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.sprites).toHaveLength(3))
+
+    const [innerGlow, outerGlow, avatar] = three.sprites
+    expect(innerGlow.renderOrder).toBe(0)
+    expect(outerGlow.renderOrder).toBe(0)
+    expect(avatar.renderOrder).toBe(1)
+    expect(innerGlow.position.set).toHaveBeenCalledWith(0, 0, -0.42)
+    expect(outerGlow.position.set).toHaveBeenCalledWith(0, 0, -0.58)
+  })
+
+  it('shares one configured procedural texture between the glow layers', async () => {
+    installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.sprites).toHaveLength(3))
+
+    expect(three.dataTextures).toHaveLength(1)
+    const glowTexture = three.dataTextures[0]
+    expect(glowTexture).toMatchObject({
+      generateMipmaps: false,
+      magFilter: 'linear',
+      minFilter: 'linear',
+      needsUpdate: true,
+    })
+    expect(glowTexture.data).toBeInstanceOf(Uint8Array)
+    expect(three.sprites[0].material.options).toMatchObject({
+      blending: 2,
+      depthWrite: false,
+      map: glowTexture,
+      transparent: true,
+    })
+    expect(three.sprites[1].material.options).toMatchObject({
+      blending: 2,
+      depthWrite: false,
+      map: glowTexture,
+      transparent: true,
+    })
+  })
+
+  it('keeps the core shells effectively transparent so they cannot form a filled disc', async () => {
+    installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalled())
+
+    expect(three.materials[0].opacity).toBeLessThanOrEqual(0.005)
+    expect(three.materials[1].opacity).toBeLessThanOrEqual(0.005)
+  })
+
   it('renders a subtle deterministic particle field around the avatar', async () => {
     installControlledBrowser()
     render(<OrbitalAvatar />)
@@ -484,33 +573,26 @@ describe('OrbitalAvatar', () => {
     })
     expect(particleField.material.options.opacity).toBeLessThanOrEqual(0.4)
     expect(particleField.renderOrder).toBeGreaterThan(
-      three.sprites[0].renderOrder,
+      three.sprites[2].renderOrder,
     )
   })
 
-  it('pulses the atmosphere slowly while normal motion is active', async () => {
+  it('pulses the inner glow slowly while normal motion is active', async () => {
     const browser = installControlledBrowser()
     render(<OrbitalAvatar />)
 
-    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
-    const atmosphere = three.meshes[1]
-    atmosphere.scale.setScalar.mockClear()
+    await waitFor(() => expect(three.sprites).toHaveLength(3))
+    three.sprites[0].scale.set.mockClear()
 
-    const [firstFrameId, firstFrame] = [...browser.pendingFrames.entries()][0]
-    browser.pendingFrames.delete(firstFrameId)
-    act(() => firstFrame(1000))
-    const firstScale = atmosphere.scale.setScalar.mock.lastCall?.[0] as number
+    const [frameId, frame] = [...browser.pendingFrames.entries()][0]
+    browser.pendingFrames.delete(frameId)
+    act(() => frame(2500))
 
-    const [secondFrameId, secondFrame] = [...browser.pendingFrames.entries()][0]
-    browser.pendingFrames.delete(secondFrameId)
-    act(() => secondFrame(2200))
-    const secondScale = atmosphere.scale.setScalar.mock.lastCall?.[0] as number
-
-    expect(firstScale).toBeGreaterThanOrEqual(0.97)
-    expect(firstScale).toBeLessThanOrEqual(1.03)
-    expect(secondScale).toBeGreaterThanOrEqual(0.97)
-    expect(secondScale).toBeLessThanOrEqual(1.03)
-    expect(secondScale).not.toBe(firstScale)
+    const [width, height, depth] =
+      three.sprites[0].scale.set.mock.lastCall as [number, number, number]
+    expect(width).not.toBeCloseTo(2.85, 4)
+    expect(height).not.toBeCloseTo(2.38, 4)
+    expect(depth).toBe(1)
   })
 
   it('keeps renderer and core quality independent from the initial viewport', async () => {
@@ -559,6 +641,10 @@ describe('OrbitalAvatar', () => {
     expect(three.lines.filter((line) => line.visible)).toHaveLength(8)
     expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(1)
     expect(three.renderers[0].setPixelRatio).toHaveBeenLastCalledWith(1.6)
+    const desktopGlowSprites = [...three.sprites.slice(0, 2)]
+    const desktopGlowTexture = three.dataTextures[0]
+    expect(desktopGlowSprites).toHaveLength(2)
+    expect(desktopGlowSprites[0].material.opacity).toBe(0.2)
 
     Object.defineProperty(window, 'innerWidth', {
       configurable: true,
@@ -583,6 +669,14 @@ describe('OrbitalAvatar', () => {
     ).toHaveLength(96 * 3)
     expect(three.points[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 28)
     expect(three.renderers[0].setPixelRatio).toHaveBeenLastCalledWith(1.15)
+    expect(three.sprites.slice(0, 2)).toEqual(desktopGlowSprites)
+    expect(three.dataTextures[0]).toBe(desktopGlowTexture)
+    expect(three.sprites[0].scale.set).toHaveBeenLastCalledWith(
+      2.85 * 0.84,
+      2.38 * 0.84,
+      1,
+    )
+    expect(three.sprites[0].material.opacity).toBeCloseTo(0.2 * 0.7)
     expect(windowRemoveEventListener).toHaveBeenCalledWith(
       'pointermove',
       expect.any(Function),
@@ -666,8 +760,8 @@ describe('OrbitalAvatar', () => {
     installControlledBrowser()
     render(<OrbitalAvatar />)
 
-    await waitFor(() => expect(three.sprites).toHaveLength(1))
-    const avatar = three.sprites[0]
+    await waitFor(() => expect(three.sprites).toHaveLength(3))
+    const avatar = three.sprites[2]
     expect(avatar.material.options.alphaTest).toEqual(expect.any(Number))
     expect(avatar.material.options.alphaTest).toBeGreaterThan(0)
     expect(avatar.material.options.depthTest).toBe(true)
@@ -770,6 +864,7 @@ describe('OrbitalAvatar', () => {
     expect(browser.resizeObservers[0].disconnect).toHaveBeenCalledTimes(1)
     expect(browser.intersectionObservers[0].disconnect).toHaveBeenCalledTimes(1)
     expect(three.textures[0].dispose).toHaveBeenCalledTimes(1)
+    expect(three.dataTextures[0].dispose).toHaveBeenCalledTimes(1)
     expect(three.geometries.length).toBeGreaterThan(0)
     expect(three.geometries.every((geometry) => geometry.dispose.mock.calls.length === 1)).toBe(true)
     expect(three.materials.length).toBeGreaterThan(0)
@@ -820,6 +915,7 @@ describe('OrbitalAvatar', () => {
     expect(rendered.container.querySelectorAll('canvas')).toHaveLength(1)
     expect(browser.requestAnimationFrame).not.toHaveBeenCalled()
     expect(three.meshes[1].scale.setScalar).toHaveBeenLastCalledWith(1)
+    expect(three.sprites[0].scale.set).toHaveBeenLastCalledWith(2.85, 2.38, 1)
   })
 
   it('redraws the stable reduced-motion frame after resize', async () => {
@@ -838,6 +934,7 @@ describe('OrbitalAvatar', () => {
     expect(
       three.meshes[1].scale.setScalar.mock.calls.every(([scale]) => scale === 1),
     ).toBe(true)
+    expect(three.sprites[0].scale.set).toHaveBeenLastCalledWith(2.85, 2.38, 1)
   })
 
   it('disposes the renderer and resources without mounting a canvas when texture loading fails', async () => {
@@ -850,6 +947,7 @@ describe('OrbitalAvatar', () => {
     await waitFor(() => expect(three.renderers[0]?.dispose).toHaveBeenCalledTimes(1))
     expect(rendered.container.querySelector('canvas')).toBeNull()
     expect(three.textures[0].dispose).toHaveBeenCalledTimes(1)
+    expect(three.dataTextures[0].dispose).toHaveBeenCalledTimes(1)
     expect(three.geometries.length).toBeGreaterThan(0)
     expect(three.geometries.every((geometry) => geometry.dispose.mock.calls.length === 1)).toBe(true)
     expect(three.materials.length).toBeGreaterThan(0)
