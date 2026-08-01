@@ -7,7 +7,9 @@ function findCssStyleRule(selector: string): CSSStyleRule | undefined {
     .flatMap((sheet) => Array.from(sheet.cssRules))
     .find(
       (rule): rule is CSSStyleRule =>
-        rule instanceof CSSStyleRule && rule.selectorText === selector,
+        rule instanceof CSSStyleRule &&
+        normalizeCssWhitespace(rule.selectorText) ===
+          normalizeCssWhitespace(selector),
     )
 }
 
