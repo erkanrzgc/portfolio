@@ -141,6 +141,9 @@ describe('global scroll container styles', () => {
   })
 
   it('keeps service orbit layers decorative and behind content', () => {
+    const childRule = allStyleRules().find(
+      (rule) => rule.selectorText === '.spotlight-card > *',
+    )
     const orbitRule = allStyleRules().find(
       (rule) => rule.selectorText === '.service-orbit',
     )
@@ -154,6 +157,8 @@ describe('global scroll container styles', () => {
       (rule) => rule.selectorText === '.service-card__content',
     )
 
+    expect(styleValue(childRule, 'position')).toBe('relative')
+    expect(Number(styleValue(childRule, 'z-index'))).toBeGreaterThan(0)
     expect(styleValue(orbitRule, 'position')).toBe('absolute')
     expect(styleValue(orbitRule, 'pointer-events')).toBe('none')
     expect(styleValue(trackRule, 'border-radius')).toBe('50%')
@@ -207,10 +212,18 @@ describe('global scroll container styles', () => {
     const nodeRule = nestedRules.find(
       (rule) => rule.selectorText === '.service-orbit__node > span',
     )
+    const activeLightRule = nestedRules.find(
+      (rule) =>
+        rule.selectorText ===
+        ".spotlight-card.spotlight-card--light[data-spotlight-active='true']",
+    )
 
     expect(styleValue(cardRule, 'transition')).toContain('transform')
     expect(styleValue(nodeRule, 'animation')).toContain(
       'service-orbit-node-drift',
+    )
+    expect(styleValue(activeLightRule, 'border-color')).toBe(
+      'rgba(126, 34, 206, 0.34)',
     )
   })
 })
