@@ -1,7 +1,7 @@
 # Kinetic Orbital Rig and Orbital Echo Services Design
 
 **Date:** 2026-08-01
-**Status:** Approved in the design dialogue; pending review of this written specification
+**Status:** Approved for implementation planning
 
 ## Goal
 
