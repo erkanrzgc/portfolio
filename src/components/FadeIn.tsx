@@ -1,6 +1,6 @@
 import {
   motion,
-  useReducedMotionConfig,
+  useReducedMotion,
   type Transition,
 } from 'framer-motion'
 import { useMemo, type ReactNode, type ElementType } from 'react'
@@ -25,7 +25,7 @@ export default function FadeIn({
   className = '',
 }: FadeInProps) {
   const MotionComponent = useMemo(() => motion.create(Component), [Component])
-  const shouldReduceMotion = useReducedMotionConfig() === true
+  const shouldReduceMotion = useReducedMotion() === true
 
   const transition: Transition = {
     duration,

@@ -1,11 +1,20 @@
 import { cleanup, render, screen } from '@testing-library/react'
-import { MotionConfig } from 'framer-motion'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import FadeIn from './FadeIn'
+
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion)'
 
 afterEach(cleanup)
 
 beforeAll(() => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      addEventListener: vi.fn(),
+      matches: query === REDUCED_MOTION_QUERY,
+      removeEventListener: vi.fn(),
+    })),
+  )
   vi.stubGlobal(
     'IntersectionObserver',
     class {
@@ -51,13 +60,12 @@ describe('FadeIn', () => {
 
   it('renders its final static state when reduced motion is requested', () => {
     render(
-      <MotionConfig reducedMotion="always">
-        <FadeIn delay={5} duration={10} x={48} y={32}>
-          Reduced motion content
-        </FadeIn>
-      </MotionConfig>,
+      <FadeIn delay={5} duration={10} x={48} y={32}>
+        Reduced motion content
+      </FadeIn>,
     )
 
+    expect(window.matchMedia).toHaveBeenCalledWith(REDUCED_MOTION_QUERY)
     const wrapper = screen.getByText('Reduced motion content')
     expect(wrapper).not.toHaveStyle({ opacity: '0' })
     expect(wrapper.style.transform).toBe('')
