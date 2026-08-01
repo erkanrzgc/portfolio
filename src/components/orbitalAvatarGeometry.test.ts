@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createParticlePositions,
   createOrbitPosition,
   createOrbitPoints,
   getOrbitDefinitions,
+  getOrbitalSceneProfile,
   type OrbitDefinition,
 } from './orbitalAvatarGeometry'
 
@@ -10,6 +12,78 @@ describe('orbital avatar geometry', () => {
   it('uses eight desktop orbits and five mobile orbits', () => {
     expect(getOrbitDefinitions(false)).toHaveLength(8)
     expect(getOrbitDefinitions(true)).toHaveLength(5)
+  })
+
+  it('selects progressively lighter responsive scene profiles', () => {
+    const desktop = getOrbitalSceneProfile({
+      coarsePointer: false,
+      width: 1440,
+    })
+    const tablet = getOrbitalSceneProfile({
+      coarsePointer: false,
+      width: 900,
+    })
+    const mobile = getOrbitalSceneProfile({
+      coarsePointer: false,
+      width: 390,
+    })
+
+    expect(desktop).toMatchObject({
+      allowPointerParallax: true,
+      orbitCount: 8,
+      orbitScale: 1,
+      tier: 'desktop',
+    })
+    expect(tablet).toMatchObject({
+      allowPointerParallax: true,
+      orbitCount: 8,
+      tier: 'tablet',
+    })
+    expect(mobile).toMatchObject({
+      allowPointerParallax: false,
+      orbitCount: 5,
+      tier: 'mobile',
+    })
+    expect(tablet.orbitScale).toBeLessThan(desktop.orbitScale)
+    expect(mobile.orbitScale).toBeLessThan(tablet.orbitScale)
+    expect(tablet.orbitSegments).toBeLessThan(desktop.orbitSegments)
+    expect(mobile.orbitSegments).toBeLessThan(tablet.orbitSegments)
+    expect(tablet.particleCount).toBeLessThan(desktop.particleCount)
+    expect(mobile.particleCount).toBeLessThan(tablet.particleCount)
+    expect(tablet.pixelRatioCap).toBeLessThan(desktop.pixelRatioCap)
+    expect(mobile.pixelRatioCap).toBeLessThan(tablet.pixelRatioCap)
+  })
+
+  it('uses the mobile workload for a coarse pointer at any width', () => {
+    const coarseDesktop = getOrbitalSceneProfile({
+      coarsePointer: true,
+      width: 1440,
+    })
+    const mobile = getOrbitalSceneProfile({
+      coarsePointer: false,
+      width: 390,
+    })
+
+    expect(coarseDesktop).toEqual(mobile)
+  })
+
+  it('creates deterministic particles throughout the orbital volume', () => {
+    const first = createParticlePositions(32)
+    const second = createParticlePositions(32)
+    const radii = Array.from({ length: 32 }, (_, index) => {
+      const x = first[index * 3]
+      const y = first[index * 3 + 1]
+      const z = first[index * 3 + 2]
+      return Math.hypot(x, y, z)
+    })
+    const depth = Array.from(first).filter((_, index) => index % 3 === 2)
+
+    expect(first).toEqual(second)
+    expect(first).toHaveLength(32 * 3)
+    expect(Math.min(...radii)).toBeGreaterThan(1.2)
+    expect(Math.max(...radii)).toBeLessThan(2.2)
+    expect(Math.min(...depth)).toBeLessThan(0)
+    expect(Math.max(...depth)).toBeGreaterThan(0)
   })
 
   it('creates deterministic closed ellipses with front and back depth', () => {

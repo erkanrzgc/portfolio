@@ -3,7 +3,10 @@ import { useEffect, useRef } from 'react'
 import {
   createOrbitPoints,
   createOrbitPosition,
+  createParticlePositions,
   getOrbitDefinitions,
+  getOrbitalSceneProfile,
+  type OrbitalSceneProfile,
 } from './orbitalAvatarGeometry'
 
 export interface OrbitalAvatarProps {
@@ -13,9 +16,13 @@ export interface OrbitalAvatarProps {
 }
 
 const AVATAR_TEXTURE = '/images/avatar-transparent.png'
-const MOBILE_QUERY = '(max-width: 767px)'
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 const FINE_POINTER_QUERY = '(hover: hover) and (pointer: fine)'
+const COARSE_POINTER_QUERY = '(pointer: coarse)'
+const MAX_SCENE_PROFILE = getOrbitalSceneProfile({
+  coarsePointer: false,
+  width: 1440,
+})
 
 export default function OrbitalAvatar({
   className,
@@ -76,18 +83,21 @@ export default function OrbitalAvatar({
       }
 
       try {
-        const mobileQuery = window.matchMedia(MOBILE_QUERY)
         const reducedMotionQuery = window.matchMedia(REDUCED_MOTION_QUERY)
         const finePointerQuery = window.matchMedia(FINE_POINTER_QUERY)
-        const isMobile = mobileQuery.matches || window.innerWidth < 768
-        const hasFinePointer = finePointerQuery.matches
+        const coarsePointerQuery = window.matchMedia(COARSE_POINTER_QUERY)
+        let activeProfile: OrbitalSceneProfile = getOrbitalSceneProfile({
+          coarsePointer: coarsePointerQuery.matches,
+          width: window.innerWidth,
+        })
         let prefersReducedMotion = reducedMotionQuery.matches
         let intersectsViewport = true
         let readySignalled = false
+        let pointerListenerAttached = false
 
         renderer = new THREE.WebGLRenderer({
           alpha: true,
-          antialias: !isMobile,
+          antialias: true,
         })
 
         disposeScene = () => {
@@ -114,19 +124,21 @@ export default function OrbitalAvatar({
 
         renderer.setClearColor(0x000000, 0)
         renderer.setPixelRatio(
-          Math.min(window.devicePixelRatio || 1, isMobile ? 1.15 : 1.6),
+          Math.min(window.devicePixelRatio || 1, activeProfile.pixelRatioCap),
         )
 
         const scene = new THREE.Scene()
         const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100)
         camera.position.z = 5.4
         const root = new THREE.Group()
+        const orbitalGroup = new THREE.Group()
         scene.add(root)
+        root.add(orbitalGroup)
 
         const coreGeometry = new THREE.SphereGeometry(
           1.08,
-          isMobile ? 24 : 36,
-          isMobile ? 18 : 28,
+          36,
+          28,
         )
         geometries.push(coreGeometry)
         const coreMaterial = new THREE.MeshBasicMaterial({
@@ -141,8 +153,8 @@ export default function OrbitalAvatar({
 
         const atmosphereGeometry = new THREE.SphereGeometry(
           1.16,
-          isMobile ? 24 : 36,
-          isMobile ? 18 : 28,
+          36,
+          28,
         )
         geometries.push(atmosphereGeometry)
         const atmosphereMaterial = new THREE.MeshBasicMaterial({
@@ -160,16 +172,17 @@ export default function OrbitalAvatar({
         )
         root.add(atmosphere)
 
-        const orbits = getOrbitDefinitions(isMobile)
-        const satellites = orbits.map((orbit) => {
+        const orbits = getOrbitDefinitions(false)
+        const orbitActors = orbits.map((orbit) => {
           const orbitGeometry = new THREE.BufferGeometry()
           geometries.push(orbitGeometry)
+          const orbitPosition = new THREE.Float32BufferAttribute(
+            createOrbitPoints(orbit, MAX_SCENE_PROFILE.orbitSegments),
+            3,
+          )
           orbitGeometry.setAttribute(
             'position',
-            new THREE.Float32BufferAttribute(
-              createOrbitPoints(orbit, isMobile ? 56 : 96),
-              3,
-            ),
+            orbitPosition,
           )
           const orbitMaterial = new THREE.LineBasicMaterial({
             color: orbit.color,
@@ -181,10 +194,10 @@ export default function OrbitalAvatar({
           materials.push(orbitMaterial)
           const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial)
           orbitLine.renderOrder = 2
-          root.add(orbitLine)
+          orbitalGroup.add(orbitLine)
 
           const satelliteGeometry = new THREE.SphereGeometry(
-            isMobile ? 0.035 : 0.04,
+            0.04,
             10,
             8,
           )
@@ -202,18 +215,106 @@ export default function OrbitalAvatar({
             satelliteMaterial,
           )
           satellite.renderOrder = 2
-          root.add(satellite)
+          orbitalGroup.add(satellite)
 
-          return { mesh: satellite, orbit }
+          return {
+            geometry: orbitGeometry,
+            line: orbitLine,
+            mesh: satellite,
+            orbit,
+            position: orbitPosition,
+          }
         })
 
+        const particleGeometry = new THREE.BufferGeometry()
+        geometries.push(particleGeometry)
+        const particlePosition = new THREE.Float32BufferAttribute(
+          createParticlePositions(MAX_SCENE_PROFILE.particleCount),
+          3,
+        )
+        particleGeometry.setAttribute(
+          'position',
+          particlePosition,
+        )
+        const particleMaterial = new THREE.PointsMaterial({
+          blending: THREE.AdditiveBlending,
+          color: 0xc4b5fd,
+          depthTest: true,
+          depthWrite: false,
+          opacity: 0.32,
+          size: 0.026,
+          sizeAttenuation: true,
+          transparent: true,
+        })
+        materials.push(particleMaterial)
+        const particleField = new THREE.Points(
+          particleGeometry,
+          particleMaterial,
+        )
+        particleField.renderOrder = 2
+        orbitalGroup.add(particleField)
+
         const pointer = { x: 0, y: 0 }
+
+        const applySceneProfile = (
+          nextProfile: OrbitalSceneProfile,
+          force = false,
+        ) => {
+          if (!renderer) return
+          const changed = force || nextProfile !== activeProfile
+          activeProfile = nextProfile
+
+          orbitalGroup.scale.setScalar(activeProfile.orbitScale)
+          orbitActors.forEach((actor, index) => {
+            const visible = index < activeProfile.orbitCount
+            actor.line.visible = visible
+            actor.mesh.visible = visible
+            if (changed) {
+              const nextPositions = createOrbitPoints(
+                actor.orbit,
+                activeProfile.orbitSegments,
+              )
+              actor.position.array.fill(0)
+              actor.position.array.set(nextPositions)
+              actor.position.needsUpdate = true
+            }
+            actor.geometry.setDrawRange(
+              0,
+              activeProfile.orbitSegments + 1,
+            )
+          })
+          if (changed) {
+            const nextPositions = createParticlePositions(
+              activeProfile.particleCount,
+            )
+            particlePosition.array.fill(0)
+            particlePosition.array.set(nextPositions)
+            particlePosition.needsUpdate = true
+          }
+          particleGeometry.setDrawRange(0, activeProfile.particleCount)
+          renderer.setPixelRatio(
+            Math.min(
+              window.devicePixelRatio || 1,
+              activeProfile.pixelRatioCap,
+            ),
+          )
+
+          if (!activeProfile.allowPointerParallax) {
+            pointer.x = 0
+            pointer.y = 0
+          }
+        }
+
+        applySceneProfile(activeProfile, true)
+
+        let syncPointerListener = () => undefined
 
         const renderFrame = (time: number) => {
           if (disposed || !renderer) return
           const animationTime = prefersReducedMotion ? 0 : time
 
-          satellites.forEach(({ mesh, orbit }) => {
+          orbitActors.forEach(({ mesh, orbit }, index) => {
+            if (index >= activeProfile.orbitCount) return
             const [x, y, z] = createOrbitPosition(
               orbit,
               orbit.phase + animationTime * orbit.speed * orbit.direction,
@@ -221,17 +322,36 @@ export default function OrbitalAvatar({
             mesh.position.set(x, y, z)
           })
 
+          atmosphere.scale.setScalar(
+            1 + Math.sin(animationTime * 0.0007) * 0.022,
+          )
+          particleField.rotation.x = animationTime * 0.000006
+          particleField.rotation.y = animationTime * -0.000012
+
+          const canUsePointer =
+            !prefersReducedMotion &&
+            activeProfile.allowPointerParallax &&
+            finePointerQuery.matches &&
+            !coarsePointerQuery.matches
           root.rotation.x = prefersReducedMotion
             ? 0.04
-            : 0.04 + pointer.y * 0.06
+            : 0.04 + (canUsePointer ? pointer.y : 0) * 0.06
           root.rotation.y = prefersReducedMotion
             ? 0
-            : animationTime * 0.000025 + pointer.x * 0.08
+            : animationTime * 0.000025 +
+              (canUsePointer ? pointer.x : 0) * 0.08
           renderer.render(scene, camera)
         }
 
         const resize = () => {
           if (disposed || !renderer) return
+          applySceneProfile(
+            getOrbitalSceneProfile({
+              coarsePointer: coarsePointerQuery.matches,
+              width: window.innerWidth,
+            }),
+          )
+          syncPointerListener()
           const width = Math.max(1, container.clientWidth)
           const height = Math.max(1, container.clientHeight)
           camera.aspect = width / height
@@ -283,6 +403,7 @@ export default function OrbitalAvatar({
         }
         const handleVisibilityChange = () => {
           try {
+            syncPointerListener()
             refreshLoop()
           } catch {
             failScene()
@@ -292,6 +413,9 @@ export default function OrbitalAvatar({
           if (
             disposed ||
             prefersReducedMotion ||
+            !activeProfile.allowPointerParallax ||
+            !finePointerQuery.matches ||
+            coarsePointerQuery.matches ||
             !intersectsViewport ||
             document.hidden
           ) {
@@ -308,14 +432,49 @@ export default function OrbitalAvatar({
             failScene()
           }
         }
+        syncPointerListener = () => {
+          const shouldListen =
+            sceneReady &&
+            !disposed &&
+            !prefersReducedMotion &&
+            intersectsViewport &&
+            !document.hidden &&
+            activeProfile.allowPointerParallax &&
+            finePointerQuery.matches &&
+            !coarsePointerQuery.matches
+
+          if (shouldListen && !pointerListenerAttached) {
+            window.addEventListener('pointermove', handlePointerMove)
+            pointerListenerAttached = true
+          } else if (!shouldListen && pointerListenerAttached) {
+            window.removeEventListener('pointermove', handlePointerMove)
+            pointerListenerAttached = false
+          }
+
+          if (!shouldListen) {
+            pointer.x = 0
+            pointer.y = 0
+          }
+        }
         const handleReducedMotionChange = (event: MediaQueryListEvent) => {
           try {
             prefersReducedMotion = event.matches
+            syncPointerListener()
             refreshLoop()
             if (prefersReducedMotion) renderFrame(0)
           } catch {
             failScene()
           }
+        }
+        const handleFinePointerChange = () => {
+          try {
+            syncPointerListener()
+          } catch {
+            failScene()
+          }
+        }
+        const handleCoarsePointerChange = () => {
+          safelyResize()
         }
 
         const loadedTexture = await new Promise<import('three').Texture>(
@@ -374,6 +533,10 @@ export default function OrbitalAvatar({
         removeListeners.push(() =>
           window.removeEventListener('resize', safelyResize),
         )
+        window.addEventListener('orientationchange', safelyResize)
+        removeListeners.push(() =>
+          window.removeEventListener('orientationchange', safelyResize),
+        )
         document.addEventListener('visibilitychange', handleVisibilityChange)
         removeListeners.push(() =>
           document.removeEventListener(
@@ -391,12 +554,30 @@ export default function OrbitalAvatar({
             handleReducedMotionChange,
           ),
         )
-        if (hasFinePointer) {
-          window.addEventListener('pointermove', handlePointerMove)
-          removeListeners.push(() =>
-            window.removeEventListener('pointermove', handlePointerMove),
-          )
-        }
+        finePointerQuery.addEventListener('change', handleFinePointerChange)
+        removeListeners.push(() =>
+          finePointerQuery.removeEventListener(
+            'change',
+            handleFinePointerChange,
+          ),
+        )
+        coarsePointerQuery.addEventListener(
+          'change',
+          handleCoarsePointerChange,
+        )
+        removeListeners.push(() =>
+          coarsePointerQuery.removeEventListener(
+            'change',
+            handleCoarsePointerChange,
+          ),
+        )
+        removeListeners.push(() => {
+          if (pointerListenerAttached) {
+            window.removeEventListener('pointermove', handlePointerMove)
+            pointerListenerAttached = false
+          }
+        })
+        syncPointerListener()
 
         if (typeof ResizeObserver !== 'undefined') {
           resizeObserver = new ResizeObserver(safelyResize)
@@ -406,6 +587,7 @@ export default function OrbitalAvatar({
           intersectionObserver = new IntersectionObserver((entries) => {
             try {
               intersectsViewport = entries.some((entry) => entry.isIntersecting)
+              syncPointerListener()
               refreshLoop()
             } catch {
               failScene()

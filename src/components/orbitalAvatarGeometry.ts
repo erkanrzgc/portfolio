@@ -8,6 +8,51 @@ export interface OrbitDefinition {
   readonly color: number
 }
 
+export interface OrbitalSceneProfile {
+  readonly tier: 'desktop' | 'tablet' | 'mobile'
+  readonly allowPointerParallax: boolean
+  readonly orbitCount: number
+  readonly orbitScale: number
+  readonly orbitSegments: number
+  readonly particleCount: number
+  readonly pixelRatioCap: number
+}
+
+export interface OrbitalSceneProfileInput {
+  readonly coarsePointer: boolean
+  readonly width: number
+}
+
+const DESKTOP_PROFILE: OrbitalSceneProfile = Object.freeze({
+  tier: 'desktop',
+  allowPointerParallax: true,
+  orbitCount: 8,
+  orbitScale: 1,
+  orbitSegments: 96,
+  particleCount: 96,
+  pixelRatioCap: 1.6,
+})
+
+const TABLET_PROFILE: OrbitalSceneProfile = Object.freeze({
+  tier: 'tablet',
+  allowPointerParallax: true,
+  orbitCount: 8,
+  orbitScale: 0.88,
+  orbitSegments: 72,
+  particleCount: 56,
+  pixelRatioCap: 1.35,
+})
+
+const MOBILE_PROFILE: OrbitalSceneProfile = Object.freeze({
+  tier: 'mobile',
+  allowPointerParallax: false,
+  orbitCount: 5,
+  orbitScale: 0.76,
+  orbitSegments: 56,
+  particleCount: 28,
+  pixelRatioCap: 1.15,
+})
+
 const ORBITS: readonly OrbitDefinition[] = [
   { radiusX: 1.95, radiusY: 0.56, rotation: [1.12, 0.08, 0.02], speed: 0.00018, phase: 0.1, direction: 1, color: 0xd8b4fe },
   { radiusX: 1.82, radiusY: 0.68, rotation: [0.94, 0.51, 0.62], speed: 0.00023, phase: 0.7, direction: -1, color: 0xc084fc },
@@ -21,6 +66,40 @@ const ORBITS: readonly OrbitDefinition[] = [
 
 export function getOrbitDefinitions(isMobile: boolean): readonly OrbitDefinition[] {
   return ORBITS.slice(0, isMobile ? 5 : 8)
+}
+
+export function getOrbitalSceneProfile({
+  coarsePointer,
+  width,
+}: OrbitalSceneProfileInput): OrbitalSceneProfile {
+  if (coarsePointer || width < 768) return MOBILE_PROFILE
+  if (width < 1024) return TABLET_PROFILE
+  return DESKTOP_PROFILE
+}
+
+export function createParticlePositions(count: number): Float32Array {
+  const particleCount = Number.isFinite(count)
+    ? Math.max(0, Math.floor(count))
+    : 0
+  const positions = new Float32Array(particleCount * 3)
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5))
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const vertical = 1 - (2 * (index + 0.5)) / particleCount
+    const horizontal = Math.sqrt(Math.max(0, 1 - vertical * vertical))
+    const angle = index * goldenAngle
+    const radiusStep =
+      particleCount > 1
+        ? ((index * 37) % particleCount) / (particleCount - 1)
+        : 0
+    const radius = 1.28 + radiusStep * 0.78
+
+    positions[index * 3] = Math.cos(angle) * horizontal * radius
+    positions[index * 3 + 1] = vertical * radius
+    positions[index * 3 + 2] = Math.sin(angle) * horizontal * radius
+  }
+
+  return positions
 }
 
 export function createOrbitPosition(

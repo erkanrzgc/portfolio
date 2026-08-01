@@ -21,16 +21,48 @@ const three = vi.hoisted(() => {
       dispose: ReturnType<typeof vi.fn>
     }>,
     geometries: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,
+    bufferGeometries: [] as Array<{
+      attributes: Record<string, unknown>
+      dispose: ReturnType<typeof vi.fn>
+      setAttribute: ReturnType<typeof vi.fn>
+      setDrawRange: ReturnType<typeof vi.fn>
+    }>,
     materials: [] as Array<{
       dispose: ReturnType<typeof vi.fn>
       options: Record<string, unknown>
     }>,
     lines: [] as Array<{
+      geometry: {
+        attributes: Record<string, unknown>
+        setAttribute: ReturnType<typeof vi.fn>
+        setDrawRange: ReturnType<typeof vi.fn>
+      }
       material: { options: Record<string, unknown> }
       renderOrder: number
+      visible: boolean
     }>,
     meshes: [] as Array<{
       position: { set: ReturnType<typeof vi.fn> }
+      scale: { setScalar: ReturnType<typeof vi.fn> }
+      visible: boolean
+    }>,
+    groups: [] as Array<{
+      rotation: { x: number; y: number; z: number }
+      scale: { setScalar: ReturnType<typeof vi.fn> }
+    }>,
+    points: [] as Array<{
+      geometry: {
+        attributes: Record<string, unknown>
+        setDrawRange: ReturnType<typeof vi.fn>
+      }
+      material: { options: Record<string, unknown> }
+      renderOrder: number
+      rotation: { x: number; y: number; z: number }
+    }>,
+    sphereGeometries: [] as Array<{
+      heightSegments: number
+      radius: number
+      widthSegments: number
     }>,
     sprites: [] as Array<{
       material: { options: Record<string, unknown> }
@@ -51,7 +83,16 @@ vi.mock('three', () => {
   }
 
   class BufferGeometry extends DisposableGeometry {
-    setAttribute = vi.fn()
+    attributes: Record<string, unknown> = {}
+    setAttribute = vi.fn((name: string, attribute: unknown) => {
+      this.attributes[name] = attribute
+    })
+    setDrawRange = vi.fn()
+
+    constructor() {
+      super()
+      three.bufferGeometries.push(this)
+    }
   }
 
   class DisposableMaterial {
@@ -69,6 +110,8 @@ vi.mock('three', () => {
     BackSide: 1,
     BufferGeometry,
     Float32BufferAttribute: class {
+      needsUpdate = false
+
       constructor(
         public array: Float32Array,
         public itemSize: number,
@@ -77,12 +120,22 @@ vi.mock('three', () => {
     Group: class {
       add = vi.fn()
       rotation = { x: 0, y: 0, z: 0 }
+      scale = { setScalar: vi.fn() }
+
+      constructor() {
+        three.groups.push(this)
+      }
     },
     Line: class {
       renderOrder = 0
+      visible = true
 
       constructor(
-        public geometry: unknown,
+        public geometry: {
+          attributes: Record<string, unknown>
+          setAttribute: ReturnType<typeof vi.fn>
+          setDrawRange: ReturnType<typeof vi.fn>
+        },
         public material: { options: Record<string, unknown> },
       ) {
         three.lines.push(this)
@@ -91,6 +144,8 @@ vi.mock('three', () => {
     LineBasicMaterial: DisposableMaterial,
     Mesh: class {
       position = createPosition()
+      scale = { setScalar: vi.fn() }
+      visible = true
 
       constructor(
         public geometry: unknown,
@@ -108,7 +163,31 @@ vi.mock('three', () => {
     Scene: class {
       add = vi.fn()
     },
-    SphereGeometry: class extends DisposableGeometry {},
+    Points: class {
+      renderOrder = 0
+      rotation = { x: 0, y: 0, z: 0 }
+
+      constructor(
+        public geometry: {
+          attributes: Record<string, unknown>
+          setDrawRange: ReturnType<typeof vi.fn>
+        },
+        public material: { options: Record<string, unknown> },
+      ) {
+        three.points.push(this)
+      }
+    },
+    PointsMaterial: DisposableMaterial,
+    SphereGeometry: class extends DisposableGeometry {
+      constructor(
+        public radius: number,
+        public widthSegments: number,
+        public heightSegments: number,
+      ) {
+        super()
+        three.sphereGeometries.push(this)
+      }
+    },
     Sprite: class {
       position = createPosition()
       renderOrder = 0
@@ -197,6 +276,7 @@ interface ControlledBrowser {
 
 function installControlledBrowser({
   finePointer = false,
+  coarsePointer = false,
   reducedMotion = false,
 } = {}): ControlledBrowser {
   let frameId = 0
@@ -221,9 +301,11 @@ function installControlledBrowser({
         matches:
           query === '(prefers-reduced-motion: reduce)'
             ? reducedMotion
-            : query === '(hover: hover) and (pointer: fine)'
-              ? finePointer
-              : false,
+            : query === '(pointer: coarse)'
+              ? coarsePointer
+              : query === '(hover: hover) and (pointer: fine)'
+                ? finePointer
+                : false,
         media: query,
         onchange: null,
         removeEventListener: vi.fn(),
@@ -283,13 +365,21 @@ beforeEach(() => {
   three.renderers.length = 0
   three.textures.length = 0
   three.geometries.length = 0
+  three.bufferGeometries.length = 0
   three.materials.length = 0
   three.lines.length = 0
   three.meshes.length = 0
+  three.groups.length = 0
+  three.points.length = 0
+  three.sphereGeometries.length = 0
   three.sprites.length = 0
   Object.defineProperty(window, 'innerWidth', {
     configurable: true,
     value: 1024,
+  })
+  Object.defineProperty(window, 'devicePixelRatio', {
+    configurable: true,
+    value: 1,
   })
 })
 
@@ -369,6 +459,185 @@ describe('OrbitalAvatar', () => {
     expect(onReady).toHaveBeenCalledTimes(1)
     expect(three.meshes.slice(2).every((mesh) => mesh.position.set.mock.calls.length > 0)).toBe(true)
     expect(browser.pendingFrames).toHaveLength(1)
+  })
+
+  it('renders a subtle deterministic particle field around the avatar', async () => {
+    installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.points).toHaveLength(1))
+    const particleField = three.points[0]
+    const position = particleField.geometry.attributes.position as {
+      array: Float32Array
+      itemSize: number
+    }
+
+    expect(position.itemSize).toBe(3)
+    expect(position.array).toHaveLength(96 * 3)
+    expect(particleField.geometry.setDrawRange).toHaveBeenLastCalledWith(0, 96)
+    expect(particleField.material.options).toMatchObject({
+      blending: 2,
+      depthWrite: false,
+      opacity: expect.any(Number),
+      size: expect.any(Number),
+      transparent: true,
+    })
+    expect(particleField.material.options.opacity).toBeLessThanOrEqual(0.4)
+    expect(particleField.renderOrder).toBeGreaterThan(
+      three.sprites[0].renderOrder,
+    )
+  })
+
+  it('pulses the atmosphere slowly while normal motion is active', async () => {
+    const browser = installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const atmosphere = three.meshes[1]
+    atmosphere.scale.setScalar.mockClear()
+
+    const [firstFrameId, firstFrame] = [...browser.pendingFrames.entries()][0]
+    browser.pendingFrames.delete(firstFrameId)
+    act(() => firstFrame(1000))
+    const firstScale = atmosphere.scale.setScalar.mock.lastCall?.[0] as number
+
+    const [secondFrameId, secondFrame] = [...browser.pendingFrames.entries()][0]
+    browser.pendingFrames.delete(secondFrameId)
+    act(() => secondFrame(2200))
+    const secondScale = atmosphere.scale.setScalar.mock.lastCall?.[0] as number
+
+    expect(firstScale).toBeGreaterThanOrEqual(0.97)
+    expect(firstScale).toBeLessThanOrEqual(1.03)
+    expect(secondScale).toBeGreaterThanOrEqual(0.97)
+    expect(secondScale).toBeLessThanOrEqual(1.03)
+    expect(secondScale).not.toBe(firstScale)
+  })
+
+  it('keeps renderer and core quality independent from the initial viewport', async () => {
+    installControlledBrowser({ coarsePointer: true })
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 390,
+    })
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.renderers).toHaveLength(1))
+
+    expect(three.rendererConstructor).toHaveBeenCalledWith({
+      alpha: true,
+      antialias: true,
+    })
+    expect(three.sphereGeometries[0]).toMatchObject({
+      heightSegments: 28,
+      radius: 1.08,
+      widthSegments: 36,
+    })
+    expect(three.sphereGeometries[1]).toMatchObject({
+      heightSegments: 28,
+      radius: 1.16,
+      widthSegments: 36,
+    })
+  })
+
+  it('reapplies mobile and tablet workloads after orientation or breakpoint changes', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const windowAddEventListener = vi.spyOn(window, 'addEventListener')
+    const windowRemoveEventListener = vi.spyOn(window, 'removeEventListener')
+    Object.defineProperty(window, 'devicePixelRatio', {
+      configurable: true,
+      value: 2,
+    })
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const desktopPosition = three.lines[0].geometry.attributes.position as {
+      array: Float32Array
+    }
+    const desktopParticlePosition = three.points[0].geometry.attributes.position
+    expect(desktopPosition.array).toHaveLength((96 + 1) * 3)
+    expect(three.lines[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 97)
+    expect(three.lines.filter((line) => line.visible)).toHaveLength(8)
+    expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(1)
+    expect(three.renderers[0].setPixelRatio).toHaveBeenLastCalledWith(1.6)
+
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 390,
+    })
+    act(() => window.dispatchEvent(new Event('orientationchange')))
+
+    const mobilePosition = three.lines[0].geometry.attributes.position as {
+      array: Float32Array
+    }
+    expect(mobilePosition).toBe(desktopPosition)
+    expect(mobilePosition.array).toHaveLength((96 + 1) * 3)
+    expect(three.lines[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 57)
+    expect(three.lines.filter((line) => line.visible)).toHaveLength(5)
+    expect(three.meshes.slice(2).filter((mesh) => mesh.visible)).toHaveLength(5)
+    expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(0.76)
+    expect(three.points[0].geometry.attributes.position).toBe(
+      desktopParticlePosition,
+    )
+    expect(
+      (desktopParticlePosition as { array: Float32Array }).array,
+    ).toHaveLength(96 * 3)
+    expect(three.points[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 28)
+    expect(three.renderers[0].setPixelRatio).toHaveBeenLastCalledWith(1.15)
+    expect(windowRemoveEventListener).toHaveBeenCalledWith(
+      'pointermove',
+      expect.any(Function),
+    )
+
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 900,
+    })
+    act(() => window.dispatchEvent(new Event('resize')))
+
+    const tabletPosition = three.lines[0].geometry.attributes.position as {
+      array: Float32Array
+    }
+    expect(tabletPosition).toBe(desktopPosition)
+    expect(tabletPosition.array).toHaveLength((96 + 1) * 3)
+    expect(three.lines[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 73)
+    expect(three.lines.filter((line) => line.visible)).toHaveLength(8)
+    expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(0.88)
+    expect(three.points[0].geometry.attributes.position).toBe(
+      desktopParticlePosition,
+    )
+    expect(three.points[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 56)
+    expect(three.renderers[0].setPixelRatio).toHaveBeenLastCalledWith(1.35)
+    expect(
+      windowAddEventListener.mock.calls.filter(([type]) => type === 'pointermove'),
+    ).toHaveLength(2)
+  })
+
+  it('downgrades a wide scene when the pointer becomes coarse', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const windowRemoveEventListener = vi.spyOn(window, 'removeEventListener')
+    render(<OrbitalAvatar />)
+
+    await waitFor(() =>
+      expect(browser.media.has('(pointer: coarse)')).toBe(true),
+    )
+    const coarsePointerMedia = browser.media.get('(pointer: coarse)')!
+    coarsePointerMedia.matches = true
+    const coarsePointerHandler =
+      coarsePointerMedia.addEventListener.mock.calls.find(
+        ([type]) => type === 'change',
+      )?.[1] as EventListener
+    expect(coarsePointerHandler).toEqual(expect.any(Function))
+
+    act(() =>
+      coarsePointerHandler({ matches: true } as unknown as MediaQueryListEvent),
+    )
+
+    expect(three.lines.filter((line) => line.visible)).toHaveLength(5)
+    expect(three.points[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 28)
+    expect(windowRemoveEventListener).toHaveBeenCalledWith(
+      'pointermove',
+      expect.any(Function),
+    )
   })
 
   it('removes a failed scene and signals unavailability once after readiness', async () => {
@@ -467,6 +736,9 @@ describe('OrbitalAvatar', () => {
     const resizeHandler = windowAddEventListener.mock.calls.find(
       ([type]) => type === 'resize',
     )?.[1]
+    const orientationHandler = windowAddEventListener.mock.calls.find(
+      ([type]) => type === 'orientationchange',
+    )?.[1]
     const pointerHandler = windowAddEventListener.mock.calls.find(
       ([type]) => type === 'pointermove',
     )?.[1]
@@ -479,6 +751,18 @@ describe('OrbitalAvatar', () => {
     const reducedMotionHandler = reducedMotionMedia?.addEventListener.mock.calls.find(
       ([type]) => type === 'change',
     )?.[1]
+    const finePointerMedia = browser.media.get(
+      '(hover: hover) and (pointer: fine)',
+    )
+    const finePointerHandler =
+      finePointerMedia?.addEventListener.mock.calls.find(
+        ([type]) => type === 'change',
+      )?.[1]
+    const coarsePointerMedia = browser.media.get('(pointer: coarse)')
+    const coarsePointerHandler =
+      coarsePointerMedia?.addEventListener.mock.calls.find(
+        ([type]) => type === 'change',
+      )?.[1]
     const scheduledCallback = [...browser.pendingFrames.values()][0]
     rendered.unmount()
 
@@ -497,6 +781,10 @@ describe('OrbitalAvatar', () => {
       resizeHandler,
     )
     expect(windowRemoveEventListener).toHaveBeenCalledWith(
+      'orientationchange',
+      orientationHandler,
+    )
+    expect(windowRemoveEventListener).toHaveBeenCalledWith(
       'pointermove',
       pointerHandler,
     )
@@ -507,6 +795,14 @@ describe('OrbitalAvatar', () => {
     expect(reducedMotionMedia?.removeEventListener).toHaveBeenCalledWith(
       'change',
       reducedMotionHandler,
+    )
+    expect(finePointerMedia?.removeEventListener).toHaveBeenCalledWith(
+      'change',
+      finePointerHandler,
+    )
+    expect(coarsePointerMedia?.removeEventListener).toHaveBeenCalledWith(
+      'change',
+      coarsePointerHandler,
     )
 
     act(() => scheduledCallback(2000))
@@ -523,6 +819,7 @@ describe('OrbitalAvatar', () => {
     await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalledTimes(1))
     expect(rendered.container.querySelectorAll('canvas')).toHaveLength(1)
     expect(browser.requestAnimationFrame).not.toHaveBeenCalled()
+    expect(three.meshes[1].scale.setScalar).toHaveBeenLastCalledWith(1)
   })
 
   it('redraws the stable reduced-motion frame after resize', async () => {
@@ -538,6 +835,9 @@ describe('OrbitalAvatar', () => {
 
     expect(three.renderers[0].render).toHaveBeenCalledTimes(2)
     expect(browser.requestAnimationFrame).not.toHaveBeenCalled()
+    expect(
+      three.meshes[1].scale.setScalar.mock.calls.every(([scale]) => scale === 1),
+    ).toBe(true)
   })
 
   it('disposes the renderer and resources without mounting a canvas when texture loading fails', async () => {
