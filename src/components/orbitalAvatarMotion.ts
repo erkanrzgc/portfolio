@@ -177,3 +177,77 @@ export const stepOrbitalMotion = (
     avatarScale: 1 + Math.sin(elapsedSeconds * 0.45) * 0.008,
   })
 }
+
+export type OrbitalDragIntent = 'pending' | 'scene' | 'scroll'
+
+export interface OrbitalDragIntentInput {
+  readonly coarsePointer: boolean
+  readonly deltaX: number
+  readonly deltaY: number
+}
+
+export interface OrbitMotionSeed {
+  readonly radiusX: number
+  readonly radiusY: number
+  readonly speed: number
+  readonly phase: number
+  readonly direction: 1 | -1
+}
+
+export interface OrbitMotionResponse {
+  readonly phase: number
+  readonly direction: 1 | -1
+  readonly precessionRate: number
+  readonly precessionAmplitude: number
+  readonly lag: number
+  readonly velocityInfluence: number
+}
+
+export interface OrbitRigRotation {
+  readonly x: number
+  readonly y: number
+  readonly z: number
+}
+
+const DRAG_DEAD_ZONE = 8
+const MAX_SECONDARY_ROTATION = Math.PI / 36
+
+export function resolveOrbitalDragIntent(input: OrbitalDragIntentInput): OrbitalDragIntent {
+  if (!input.coarsePointer) return 'scene'
+  const deltaX = Math.abs(finiteOrZero(input.deltaX))
+  const deltaY = Math.abs(finiteOrZero(input.deltaY))
+  if (Math.max(deltaX, deltaY) < DRAG_DEAD_ZONE) return 'pending'
+  return deltaX > deltaY ? 'scene' : 'scroll'
+}
+
+export function getOrbitMotionResponse(orbit: OrbitMotionSeed, index: number): OrbitMotionResponse {
+  const safeIndex = Math.max(0, Math.floor(finiteOrZero(index)))
+  return Object.freeze({
+    phase: orbit.phase + safeIndex * 0.73 + orbit.radiusX * 0.11,
+    direction: orbit.direction,
+    precessionRate: 0.08 + (safeIndex % 6) * 0.018,
+    precessionAmplitude: 0.01 + (safeIndex % 5) * 0.006,
+    lag: 0.35 + (safeIndex % 6) * 0.09,
+    velocityInfluence: 0.012 + (safeIndex % 5) * 0.005,
+  })
+}
+
+export function getOrbitRigRotation(
+  response: OrbitMotionResponse,
+  elapsedSeconds: number,
+  pitchVelocity: number,
+  yawVelocity: number,
+): OrbitRigRotation {
+  const elapsed = Math.max(0, finiteOrZero(elapsedSeconds))
+  const phase = response.phase + elapsed * response.precessionRate * response.direction
+  const x = Math.sin(phase) * response.precessionAmplitude
+    + finiteOrZero(yawVelocity) * response.velocityInfluence
+  const y = Math.cos(phase * 0.73) * response.precessionAmplitude * response.lag
+    + finiteOrZero(pitchVelocity) * response.velocityInfluence
+  const z = Math.sin(phase * 0.47) * response.precessionAmplitude * 0.5
+  return Object.freeze({
+    x: clamp(x, -MAX_SECONDARY_ROTATION, MAX_SECONDARY_ROTATION),
+    y: clamp(y, -MAX_SECONDARY_ROTATION, MAX_SECONDARY_ROTATION),
+    z: clamp(z, -MAX_SECONDARY_ROTATION, MAX_SECONDARY_ROTATION),
+  })
+}

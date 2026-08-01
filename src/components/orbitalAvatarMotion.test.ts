@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { getOrbitDefinitions } from './orbitalAvatarGeometry'
 import {
   ORBITAL_MOTION_LIMITS,
   createOrbitalMotionState,
+  getOrbitMotionResponse,
+  getOrbitRigRotation,
+  resolveOrbitalDragIntent,
   stepOrbitalMotion,
 } from './orbitalAvatarMotion'
 
@@ -181,5 +185,41 @@ describe('orbital avatar motion', () => {
     expect(cancelled.yaw).toBe(moving.yaw)
     expect(cancelled.pitchVelocity).toBe(0)
     expect(cancelled.yawVelocity).toBe(0)
+  })
+
+  it('prefers native scrolling for coarse vertical intent', () => {
+    expect(resolveOrbitalDragIntent({ coarsePointer: false, deltaX: 0, deltaY: 0 })).toBe('scene')
+    expect(resolveOrbitalDragIntent({ coarsePointer: true, deltaX: 4, deltaY: 2 })).toBe('pending')
+    expect(resolveOrbitalDragIntent({ coarsePointer: true, deltaX: 18, deltaY: 6 })).toBe('scene')
+    expect(resolveOrbitalDragIntent({ coarsePointer: true, deltaX: 8, deltaY: 20 })).toBe('scroll')
+    expect(resolveOrbitalDragIntent({ coarsePointer: true, deltaX: 12, deltaY: 12 })).toBe('scroll')
+  })
+
+  it('creates stable bounded physical responses for all eleven orbits', () => {
+    const first = getOrbitDefinitions().map(getOrbitMotionResponse)
+    const second = getOrbitDefinitions().map(getOrbitMotionResponse)
+    expect(first).toEqual(second)
+    expect(first).toHaveLength(11)
+    first.forEach((response) => {
+      expect(response.precessionRate).toBeGreaterThanOrEqual(0.08)
+      expect(response.precessionRate).toBeLessThanOrEqual(0.18)
+      expect(response.precessionAmplitude).toBeGreaterThanOrEqual(0.01)
+      expect(response.precessionAmplitude).toBeLessThanOrEqual(0.035)
+      expect(response.lag).toBeGreaterThanOrEqual(0.35)
+      expect(response.lag).toBeLessThanOrEqual(0.8)
+      expect(response.velocityInfluence).toBeGreaterThanOrEqual(0.012)
+      expect(response.velocityInfluence).toBeLessThanOrEqual(0.035)
+    })
+  })
+
+  it('keeps secondary orbit rotation alive and below five degrees', () => {
+    const response = getOrbitMotionResponse(getOrbitDefinitions()[4], 4)
+    const first = getOrbitRigRotation(response, 0, 0, 0)
+    const later = getOrbitRigRotation(response, 8, 0.4, -0.3)
+    const limit = Math.PI / 36
+    expect(later).not.toEqual(first)
+    expect(Math.abs(later.x)).toBeLessThanOrEqual(limit)
+    expect(Math.abs(later.y)).toBeLessThanOrEqual(limit)
+    expect(Math.abs(later.z)).toBeLessThanOrEqual(limit)
   })
 })
