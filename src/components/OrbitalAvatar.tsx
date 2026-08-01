@@ -211,7 +211,7 @@ export default function OrbitalAvatar({
           return { definition, material, sprite }
         })
 
-        const orbits = getOrbitDefinitions(false)
+        const orbits = getOrbitDefinitions()
         const orbitActors = orbits.map((orbit) => {
           const orbitGeometry = new THREE.BufferGeometry()
           geometries.push(orbitGeometry)

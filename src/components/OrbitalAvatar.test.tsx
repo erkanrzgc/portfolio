@@ -510,8 +510,8 @@ describe('OrbitalAvatar', () => {
     expect(canvas?.style.width).toBe('100%')
     expect(canvas?.style.height).toBe('100%')
     expect(onReady).toHaveBeenCalledTimes(1)
-    expect(three.lines).toHaveLength(8)
-    expect(three.meshes).toHaveLength(10)
+    expect(three.lines).toHaveLength(11)
+    expect(three.meshes).toHaveLength(13)
     expect(browser.pendingFrames).toHaveLength(1)
 
     const [frameId, frame] = [...browser.pendingFrames.entries()][0]
@@ -706,7 +706,7 @@ describe('OrbitalAvatar', () => {
     const desktopParticlePosition = three.points[0].geometry.attributes.position
     expect(desktopPosition.array).toHaveLength((96 + 1) * 3)
     expect(three.lines[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 97)
-    expect(three.lines.filter((line) => line.visible)).toHaveLength(8)
+    expect(three.lines.filter((line) => line.visible)).toHaveLength(11)
     expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(1)
     expect(three.renderers[0].setPixelRatio).toHaveBeenLastCalledWith(1.6)
     const desktopGlowSprites = [...three.sprites.slice(0, 2)]
@@ -730,8 +730,8 @@ describe('OrbitalAvatar', () => {
     expect(mobilePosition).toBe(desktopPosition)
     expect(mobilePosition.array).toHaveLength((96 + 1) * 3)
     expect(three.lines[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 57)
-    expect(three.lines.filter((line) => line.visible)).toHaveLength(5)
-    expect(three.meshes.slice(2).filter((mesh) => mesh.visible)).toHaveLength(5)
+    expect(three.lines.filter((line) => line.visible)).toHaveLength(6)
+    expect(three.meshes.slice(2).filter((mesh) => mesh.visible)).toHaveLength(6)
     expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(0.76)
     expect(three.points[0].geometry.attributes.position).toBe(
       desktopParticlePosition,
@@ -771,7 +771,7 @@ describe('OrbitalAvatar', () => {
     expect(tabletPosition).toBe(desktopPosition)
     expect(tabletPosition.array).toHaveLength((96 + 1) * 3)
     expect(three.lines[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 73)
-    expect(three.lines.filter((line) => line.visible)).toHaveLength(8)
+    expect(three.lines.filter((line) => line.visible)).toHaveLength(9)
     expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(0.88)
     expect(three.points[0].geometry.attributes.position).toBe(
       desktopParticlePosition,
@@ -803,7 +803,7 @@ describe('OrbitalAvatar', () => {
       coarsePointerHandler({ matches: true } as unknown as MediaQueryListEvent),
     )
 
-    expect(three.lines.filter((line) => line.visible)).toHaveLength(5)
+    expect(three.lines.filter((line) => line.visible)).toHaveLength(6)
     expect(three.points[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 28)
     expect(windowRemoveEventListener).toHaveBeenCalledWith(
       'pointermove',
