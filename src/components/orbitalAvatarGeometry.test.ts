@@ -30,6 +30,8 @@ describe('orbital avatar geometry', () => {
 
     expect(desktop).toMatchObject({
       allowPointerParallax: true,
+      glowIntensity: 1,
+      glowScale: 1,
       orbitCount: 8,
       orbitScale: 1,
       tier: 'desktop',
@@ -46,6 +48,10 @@ describe('orbital avatar geometry', () => {
     })
     expect(tablet.orbitScale).toBeLessThan(desktop.orbitScale)
     expect(mobile.orbitScale).toBeLessThan(tablet.orbitScale)
+    expect(tablet.glowIntensity).toBeLessThan(desktop.glowIntensity)
+    expect(mobile.glowIntensity).toBeLessThan(tablet.glowIntensity)
+    expect(tablet.glowScale).toBeLessThan(desktop.glowScale)
+    expect(mobile.glowScale).toBeLessThan(tablet.glowScale)
     expect(tablet.orbitSegments).toBeLessThan(desktop.orbitSegments)
     expect(mobile.orbitSegments).toBeLessThan(tablet.orbitSegments)
     expect(tablet.particleCount).toBeLessThan(desktop.particleCount)

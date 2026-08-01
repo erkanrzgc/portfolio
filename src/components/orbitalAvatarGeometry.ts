@@ -11,6 +11,8 @@ export interface OrbitDefinition {
 export interface OrbitalSceneProfile {
   readonly tier: 'desktop' | 'tablet' | 'mobile'
   readonly allowPointerParallax: boolean
+  readonly glowIntensity: number
+  readonly glowScale: number
   readonly orbitCount: number
   readonly orbitScale: number
   readonly orbitSegments: number
@@ -26,6 +28,8 @@ export interface OrbitalSceneProfileInput {
 const DESKTOP_PROFILE: OrbitalSceneProfile = Object.freeze({
   tier: 'desktop',
   allowPointerParallax: true,
+  glowIntensity: 1,
+  glowScale: 1,
   orbitCount: 8,
   orbitScale: 1,
   orbitSegments: 96,
@@ -36,6 +40,8 @@ const DESKTOP_PROFILE: OrbitalSceneProfile = Object.freeze({
 const TABLET_PROFILE: OrbitalSceneProfile = Object.freeze({
   tier: 'tablet',
   allowPointerParallax: true,
+  glowIntensity: 0.84,
+  glowScale: 0.92,
   orbitCount: 8,
   orbitScale: 0.88,
   orbitSegments: 72,
@@ -46,6 +52,8 @@ const TABLET_PROFILE: OrbitalSceneProfile = Object.freeze({
 const MOBILE_PROFILE: OrbitalSceneProfile = Object.freeze({
   tier: 'mobile',
   allowPointerParallax: false,
+  glowIntensity: 0.7,
+  glowScale: 0.84,
   orbitCount: 5,
   orbitScale: 0.76,
   orbitSegments: 56,
