@@ -45,6 +45,16 @@ describe('orbital avatar geometry', () => {
     })
   })
 
+  it('normalizes fractional, low, and non-finite orbit segment counts', () => {
+    const orbit = getOrbitDefinitions()[0]
+
+    ;[3.8, 0, Number.POSITIVE_INFINITY].forEach((segments) => {
+      const points = createOrbitPoints(orbit, segments)
+      expect(points).toHaveLength(12)
+      expect(Array.from(points.slice(0, 3))).toEqual(Array.from(points.slice(-3)))
+    })
+  })
+
   it('selects progressively lighter responsive scene profiles', () => {
     const desktop = getOrbitalSceneProfile({
       coarsePointer: false,

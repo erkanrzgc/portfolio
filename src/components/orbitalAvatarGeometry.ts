@@ -157,11 +157,14 @@ export function createOrbitPoints(
   orbit: OrbitDefinition,
   segments: number,
 ): Float32Array {
-  const points = new Float32Array((segments + 1) * 3)
+  const safeSegments = Number.isFinite(segments)
+    ? Math.max(3, Math.floor(segments))
+    : 3
+  const points = new Float32Array((safeSegments + 1) * 3)
   const target: MutableOrbitPosition = { x: 0, y: 0, z: 0 }
 
-  for (let index = 0; index <= segments; index += 1) {
-    const angle = index === segments ? 0 : (index / segments) * Math.PI * 2
+  for (let index = 0; index <= safeSegments; index += 1) {
+    const angle = index === safeSegments ? 0 : (index / safeSegments) * Math.PI * 2
     writeOrbitPosition(orbit, angle, target)
     points[index * 3] = target.x
     points[index * 3 + 1] = target.y
