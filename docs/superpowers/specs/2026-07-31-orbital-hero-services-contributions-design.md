@@ -1,7 +1,7 @@
 # Orbital Hero, Spotlight Services, and Green Contributions Design
 
 **Date:** 2026-07-31
-**Status:** Approved for implementation planning
+**Status:** Approved for implementation planning; glow refinement approved 2026-08-01
 
 ## Goal
 
@@ -17,13 +17,25 @@ The project grid, project ordering, page navigation, and social/contact behavior
 
 ### Hero: Orbital Reactor
 
-The hero uses a purple space atmosphere with the avatar embedded inside a transparent glass-like sphere. The current opaque dark disk behind the avatar is removed completely.
+The hero uses a purple space atmosphere with the avatar embedded inside a transparent three-dimensional volume. The current opaque dark disk behind the avatar is removed completely. The volume is communicated by the orbit paths, satellites, particles, and light falloff rather than by a visible circular shell.
 
 The scene contains eight elliptical orbit paths on different three-dimensional axes. Small emissive satellites move at varied speeds and directions. Some paths pass in front of the avatar and others behind it so the scene reads as real volume instead of a flat overlay. A soft atmosphere pulses slowly around the core, and subtle pointer parallax changes the viewing angle.
 
 The intended “4D” feeling means three-dimensional depth that evolves continuously over time. It is not presented as literal four-dimensional geometry.
 
 Purple is the primary atmospheric color. Desaturated blue and restrained green highlights may be used for orbit particles, but they must not compete with the avatar or heading.
+
+#### Approved glow refinement
+
+The purple light behind the avatar must read as a soft radiating glow, matching the approved previews, rather than as a filled circle or a sphere with a visible perimeter.
+
+- Use two low-opacity additive glow layers behind the avatar, with slightly different elliptical scales and soft radial falloff.
+- Build the glow with existing Three.js primitives and a small procedural radial texture; do not add post-processing, bloom, or another runtime dependency.
+- Each layer fades completely into the page background before its outer edge; no hard ring, uniform purple fill, or circular silhouette may remain visible.
+- Any transparent core geometry retained for depth must stay below the threshold where it reads as a separate disc.
+- Normal motion may use a very slow, restrained breathing effect with no more than roughly two percent scale change. Reduced-motion mode keeps the glow static.
+- Tablet and mobile profiles reduce the glow size and intensity while preserving the same soft falloff.
+- Orbit lines, satellites, avatar depth ordering, and the subtle particle field remain unchanged.
 
 ### Services: Spotlight Bento
 
@@ -50,7 +62,7 @@ Responsibilities:
 - Lazily import Three.js after mount.
 - Create and dispose the renderer, scene, camera, textures, geometries, and materials.
 - Load `/images/avatar-transparent.png` as the central avatar texture.
-- Render the transparent core, orbit paths, atmosphere, satellites, and particles.
+- Render the low-opacity core, layered radial glow, orbit paths, atmosphere, satellites, and particles.
 - Respond to pointer position, resize, document visibility, intersection state, and reduced-motion preference.
 - Signal readiness so the static visual fallback can fade out only after the first successful frame.
 
@@ -58,7 +70,7 @@ Pure geometry helpers will generate orbit definitions and satellite placement. T
 
 ### Hero fallback
 
-The hero retains a CSS-rendered static avatar fallback underneath the canvas. It uses a transparent purple glass halo with no black fill. If Three.js cannot load, WebGL creation fails, or the avatar texture fails, the fallback remains visible. The canvas is decorative and `aria-hidden`; the fallback image retains the meaningful `Erkan avatar` alternative text.
+The hero retains a CSS-rendered static avatar fallback underneath the canvas. It uses the same diffused, edge-free purple glow with no black fill or circular shell. If Three.js cannot load, WebGL creation fails, or the avatar texture fails, the fallback remains visible. The canvas is decorative and `aria-hidden`; the fallback image retains the meaningful `Erkan avatar` alternative text.
 
 ### `SpotlightCard`
 
@@ -124,6 +136,7 @@ Automated coverage will verify:
 - Failed Three.js import, renderer creation, or texture loading leaves the fallback visible.
 - The orbital component removes listeners, observers, animation frames, and WebGL resources on unmount.
 - Reduced motion prevents continuous animation and pointer-driven motion.
+- Glow configuration preserves soft radial falloff, responsive intensity, and a static reduced-motion state.
 - Services renders six semantic service cards in the intended bento container.
 - Spotlight coordinates update for pointer interaction and remain inactive for reduced motion/coarse pointers.
 - GitHub Contributions requests the `39d353` green chart and retains the accessible link and failure fallback.
@@ -132,8 +145,8 @@ Final verification includes the focused tests, full Vitest suite, TypeScript/Vit
 
 ## Acceptance Criteria
 
-- No opaque black disk is visible behind the avatar.
-- The avatar appears embedded in a transparent purple volume.
+- No opaque black disk or visible purple circle/sphere is visible behind the avatar.
+- The avatar appears embedded in a transparent purple volume created by a soft, edge-free glow and orbital depth.
 - Eight orbit paths and moving satellites produce visible front/back depth on desktop.
 - The hero remains usable when WebGL or texture loading fails.
 - Services is an asymmetric spotlight bento grid with all six descriptions visible.
