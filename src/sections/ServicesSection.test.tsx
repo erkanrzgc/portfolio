@@ -122,4 +122,45 @@ describe('ServicesSection', () => {
       expect(icon).toHaveAttribute('aria-hidden', 'true')
     })
   })
+
+  it('adds one inaccessible orbital decoration to every service card', () => {
+    render(<ServicesSection />)
+    const articles = screen.getAllByRole('article')
+    const decorations = articles.map((article) =>
+      article.querySelector<HTMLElement>('[data-service-orbit]'),
+    )
+
+    expect(decorations).toHaveLength(6)
+    expect(decorations.every(Boolean)).toBe(true)
+    expect(
+      decorations.map((decoration) => decoration?.dataset.orbitVariant),
+    ).toEqual(['featured', 'sweep', 'halo', 'cross', 'rise', 'echo'])
+    expect(
+      decorations.map((decoration) => decoration?.dataset.orbitAccent),
+    ).toEqual(['purple', 'blue', 'purple', 'purple', 'green', 'purple'])
+    decorations.forEach((decoration, index) => {
+      expect(decoration?.parentElement).toBe(articles[index])
+      expect(articles[index].firstElementChild).toBe(decoration)
+      expect(decoration).toHaveAttribute('aria-hidden', 'true')
+      expect(decoration).not.toHaveAttribute('role')
+      expect(decoration).not.toHaveAttribute('tabindex')
+      expect(decoration?.querySelectorAll('.service-orbit__node')).toHaveLength(
+        1,
+      )
+      expect(
+        decoration?.querySelectorAll('.service-orbit__track'),
+      ).toHaveLength(index === 0 ? 2 : 1)
+    })
+  })
+
+  it('keeps service content above decoration without adding fake controls', () => {
+    render(<ServicesSection />)
+
+    screen.getAllByRole('article').forEach((article) => {
+      expect(article.querySelector('.service-card__content')).not.toBeNull()
+      expect(article).not.toHaveAttribute('tabindex')
+      expect(article).not.toHaveAttribute('role', 'button')
+    })
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
 })

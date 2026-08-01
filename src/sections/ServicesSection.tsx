@@ -6,8 +6,19 @@ import {
   Wrench,
   Workflow,
 } from 'lucide-react'
+import { type CSSProperties } from 'react'
 import FadeIn from '../components/FadeIn'
 import SpotlightCard from '../components/SpotlightCard'
+
+type OrbitVariant = 'featured' | 'sweep' | 'halo' | 'cross' | 'rise' | 'echo'
+type OrbitAccent = 'purple' | 'blue' | 'green'
+
+interface ServiceDecoration {
+  readonly variant: OrbitVariant
+  readonly accent: OrbitAccent
+  readonly node: readonly [`${number}%`, `${number}%`]
+  readonly delay: `${number}s`
+}
 
 const services = [
   {
@@ -57,6 +68,45 @@ const cardSpans = [
   'lg:col-span-2',
 ]
 
+const serviceDecorations: readonly ServiceDecoration[] = Object.freeze([
+  {
+    variant: 'featured',
+    accent: 'purple',
+    node: ['78%', '24%'],
+    delay: '-1.2s',
+  },
+  {
+    variant: 'sweep',
+    accent: 'blue',
+    node: ['76%', '32%'],
+    delay: '-2.8s',
+  },
+  {
+    variant: 'halo',
+    accent: 'purple',
+    node: ['70%', '76%'],
+    delay: '-4.1s',
+  },
+  {
+    variant: 'cross',
+    accent: 'purple',
+    node: ['26%', '72%'],
+    delay: '-1.9s',
+  },
+  {
+    variant: 'rise',
+    accent: 'green',
+    node: ['78%', '68%'],
+    delay: '-3.3s',
+  },
+  {
+    variant: 'echo',
+    accent: 'purple',
+    node: ['30%', '25%'],
+    delay: '-4.7s',
+  },
+])
+
 export default function ServicesSection() {
   return (
     <section
@@ -80,68 +130,94 @@ export default function ServicesSection() {
         aria-label="Services I provide"
         className="mx-auto grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(220px,auto)]"
       >
-        {services.map((s, i) => (
-          <FadeIn
-            key={s.name}
-            as="li"
-            delay={i * 0.1}
-            y={30}
-            className={cardSpans[i]}
-          >
-            <SpotlightCard
-              className={`spotlight-card--light h-full overflow-hidden rounded-[28px] border border-[#2c1856]/20 bg-[linear-gradient(135deg,#ffffff_0%,#f7f2ff_58%,#eee6ff_100%)] shadow-[0_18px_45px_rgba(44,24,86,0.1)] ${
-                i === 0 ? 'p-8 sm:p-10 lg:p-12' : 'p-6 sm:p-7'
-              }`}
+        {services.map((s, i) => {
+          const decoration = serviceDecorations[i]
+
+          return (
+            <FadeIn
+              key={s.name}
+              as="li"
+              delay={i * 0.1}
+              y={30}
+              className={cardSpans[i]}
             >
-              <div className="flex h-full flex-col">
-                <div className="flex items-start justify-between gap-6">
-                  <span className="text-sm font-semibold tracking-[0.18em] text-[#2c1856]/55">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span
-                    className={`flex shrink-0 items-center justify-center rounded-2xl border border-[#2c1856]/15 bg-white/75 text-[#2c1856] ${
-                      i === 0 ? 'h-20 w-20' : 'h-14 w-14'
-                    }`}
-                  >
-                    <s.icon
-                      aria-hidden="true"
-                      size={i === 0 ? 36 : 26}
-                      strokeWidth={1.8}
-                    />
+              <SpotlightCard
+                className={`spotlight-card--light h-full overflow-hidden rounded-[28px] border border-[#2c1856]/20 bg-[linear-gradient(135deg,#ffffff_0%,#f7f2ff_58%,#eee6ff_100%)] shadow-[0_18px_45px_rgba(44,24,86,0.1)] ${
+                  i === 0 ? 'p-8 sm:p-10 lg:p-12' : 'p-6 sm:p-7'
+                }`}
+              >
+                <div
+                  aria-hidden="true"
+                  className="service-orbit"
+                  data-service-orbit
+                  data-orbit-variant={decoration.variant}
+                  data-orbit-accent={decoration.accent}
+                  style={
+                    {
+                      '--service-node-x': decoration.node[0],
+                      '--service-node-y': decoration.node[1],
+                      '--service-node-delay': decoration.delay,
+                    } as CSSProperties
+                  }
+                >
+                  <span className="service-orbit__track service-orbit__track--primary" />
+                  {decoration.variant === 'featured' && (
+                    <span className="service-orbit__track service-orbit__track--secondary" />
+                  )}
+                  <span className="service-orbit__node">
+                    <span />
                   </span>
                 </div>
-                <div className={i === 0 ? 'mt-auto pt-14' : 'mt-10'}>
-                  <h3
-                    className={`font-semibold uppercase leading-[0.95] tracking-[0.02em] text-[#0C0C0C] ${
-                      i === 0
-                        ? 'text-[clamp(2rem,4vw,4.5rem)]'
-                        : 'text-[clamp(1.3rem,2vw,2rem)]'
-                    }`}
-                  >
-                    {s.name}
-                  </h3>
-                  <p
-                    className={`font-light leading-relaxed text-[#0C0C0C]/65 ${
-                      i === 0 ? 'mt-5 max-w-2xl text-lg' : 'mt-4 text-base'
-                    }`}
-                  >
-                    {s.desc}
-                  </p>
-                  <div className="mt-6 flex flex-wrap gap-2">
-                    {s.points.map((point) => (
-                      <span
-                        key={point}
-                        className="rounded-full border border-[#2c1856]/15 bg-white/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-[#2c1856]/70"
-                      >
-                        {point}
-                      </span>
-                    ))}
+                <div className="service-card__content flex h-full flex-col">
+                  <div className="flex items-start justify-between gap-6">
+                    <span className="text-sm font-semibold tracking-[0.18em] text-[#2c1856]/55">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span
+                      className={`flex shrink-0 items-center justify-center rounded-2xl border border-[#2c1856]/15 bg-white/75 text-[#2c1856] ${
+                        i === 0 ? 'h-20 w-20' : 'h-14 w-14'
+                      }`}
+                    >
+                      <s.icon
+                        aria-hidden="true"
+                        size={i === 0 ? 36 : 26}
+                        strokeWidth={1.8}
+                      />
+                    </span>
+                  </div>
+                  <div className={i === 0 ? 'mt-auto pt-14' : 'mt-10'}>
+                    <h3
+                      className={`font-semibold uppercase leading-[0.95] tracking-[0.02em] text-[#0C0C0C] ${
+                        i === 0
+                          ? 'text-[clamp(2rem,4vw,4.5rem)]'
+                          : 'text-[clamp(1.3rem,2vw,2rem)]'
+                      }`}
+                    >
+                      {s.name}
+                    </h3>
+                    <p
+                      className={`font-light leading-relaxed text-[#0C0C0C]/65 ${
+                        i === 0 ? 'mt-5 max-w-2xl text-lg' : 'mt-4 text-base'
+                      }`}
+                    >
+                      {s.desc}
+                    </p>
+                    <div className="mt-6 flex flex-wrap gap-2">
+                      {s.points.map((point) => (
+                        <span
+                          key={point}
+                          className="rounded-full border border-[#2c1856]/15 bg-white/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-[#2c1856]/70"
+                        >
+                          {point}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </SpotlightCard>
-          </FadeIn>
-        ))}
+              </SpotlightCard>
+            </FadeIn>
+          )
+        })}
       </ul>
     </section>
   )
