@@ -59,13 +59,24 @@ const three = vi.hoisted(() => {
         setAttribute: ReturnType<typeof vi.fn>
         setDrawRange: ReturnType<typeof vi.fn>
       }
-      material: { options: Record<string, unknown> }
+      material: { opacity: number; options: Record<string, unknown> }
       renderOrder: number
       visible: boolean
     }>,
     meshes: [] as Array<{
-      position: { set: ReturnType<typeof vi.fn> }
-      scale: { setScalar: ReturnType<typeof vi.fn> }
+      position: {
+        x: number
+        y: number
+        z: number
+        set: ReturnType<typeof vi.fn>
+      }
+      scale: {
+        x: number
+        y: number
+        z: number
+        set: ReturnType<typeof vi.fn>
+        setScalar: ReturnType<typeof vi.fn>
+      }
       visible: boolean
     }>,
     scenes: [] as Array<{
@@ -73,9 +84,23 @@ const three = vi.hoisted(() => {
     }>,
     groups: [] as Array<{
       add: ReturnType<typeof vi.fn>
-      position: { x: number; y: number; z: number }
+      children: unknown[]
+      name: string
+      position: {
+        x: number
+        y: number
+        z: number
+        set: ReturnType<typeof vi.fn>
+      }
       rotation: { x: number; y: number; z: number }
-      scale: { setScalar: ReturnType<typeof vi.fn> }
+      scale: {
+        x: number
+        y: number
+        z: number
+        set: ReturnType<typeof vi.fn>
+        setScalar: ReturnType<typeof vi.fn>
+      }
+      visible: boolean
     }>,
     points: [] as Array<{
       geometry: {
@@ -83,6 +108,13 @@ const three = vi.hoisted(() => {
         setDrawRange: ReturnType<typeof vi.fn>
       }
       material: { options: Record<string, unknown> }
+      scale: {
+        x: number
+        y: number
+        z: number
+        set: ReturnType<typeof vi.fn>
+        setScalar: ReturnType<typeof vi.fn>
+      }
       renderOrder: number
       rotation: { x: number; y: number; z: number }
     }>,
@@ -93,8 +125,19 @@ const three = vi.hoisted(() => {
     }>,
     sprites: [] as Array<{
       material: { opacity: number; options: Record<string, unknown> }
-      position: { set: ReturnType<typeof vi.fn> }
-      scale: { set: ReturnType<typeof vi.fn> }
+      position: {
+        x: number
+        y: number
+        z: number
+        set: ReturnType<typeof vi.fn>
+      }
+      scale: {
+        x: number
+        y: number
+        z: number
+        set: ReturnType<typeof vi.fn>
+        setScalar: ReturnType<typeof vi.fn>
+      }
       renderOrder: number
     }>,
   }
@@ -127,6 +170,7 @@ vi.mock('three', () => {
   class DisposableMaterial {
     dispose = vi.fn()
     opacity: number
+    rotation = 0
 
     constructor(public options: Record<string, unknown> = {}) {
       this.opacity = (options.opacity as number | undefined) ?? 1
@@ -134,7 +178,38 @@ vi.mock('three', () => {
     }
   }
 
-  const createPosition = () => ({ set: vi.fn() })
+  const createPosition = () => {
+    const position = {
+      x: 0,
+      y: 0,
+      z: 0,
+      set: vi.fn((x: number, y: number, z: number) => {
+        position.x = x
+        position.y = y
+        position.z = z
+      }),
+    }
+    return position
+  }
+
+  const createScale = () => {
+    const scale = {
+      x: 1,
+      y: 1,
+      z: 1,
+      set: vi.fn((x: number, y: number, z: number) => {
+        scale.x = x
+        scale.y = y
+        scale.z = z
+      }),
+      setScalar: vi.fn((value: number) => {
+        scale.x = value
+        scale.y = value
+        scale.z = value
+      }),
+    }
+    return scale
+  }
 
   return {
     AdditiveBlending: 2,
@@ -167,10 +242,12 @@ vi.mock('three', () => {
     LinearFilter: 'linear',
     Group: class {
       children: unknown[] = []
+      name = ''
+      visible = true
       add = vi.fn((child: unknown) => this.children.push(child))
-      position = { x: 0, y: 0, z: 0 }
+      position = createPosition()
       rotation = { x: 0, y: 0, z: 0 }
-      scale = { setScalar: vi.fn() }
+      scale = createScale()
 
       constructor() {
         three.groups.push(this)
@@ -186,7 +263,7 @@ vi.mock('three', () => {
           setAttribute: ReturnType<typeof vi.fn>
           setDrawRange: ReturnType<typeof vi.fn>
         },
-        public material: { options: Record<string, unknown> },
+        public material: { opacity: number; options: Record<string, unknown> },
       ) {
         three.lines.push(this)
       }
@@ -194,7 +271,7 @@ vi.mock('three', () => {
     LineBasicMaterial: DisposableMaterial,
     Mesh: class {
       position = createPosition()
-      scale = { setScalar: vi.fn() }
+      scale = createScale()
       visible = true
 
       constructor(
@@ -221,6 +298,7 @@ vi.mock('three', () => {
     Points: class {
       renderOrder = 0
       rotation = { x: 0, y: 0, z: 0 }
+      scale = createScale()
 
       constructor(
         public geometry: {
@@ -246,7 +324,7 @@ vi.mock('three', () => {
     Sprite: class {
       position = createPosition()
       renderOrder = 0
-      scale = { set: vi.fn() }
+      scale = createScale()
 
       constructor(
         public material: { opacity: number; options: Record<string, unknown> },
@@ -314,6 +392,12 @@ vi.mock('three', () => {
 })
 
 import OrbitalAvatar from './OrbitalAvatar'
+
+function getGroup(name: string) {
+  const group = three.groups.find((candidate) => candidate.name === name)
+  if (!group) throw new Error(`Expected group ${name}`)
+  return group
+}
 
 interface ControlledBrowser {
   cancelAnimationFrame: ReturnType<typeof vi.fn>
@@ -524,6 +608,78 @@ describe('OrbitalAvatar', () => {
     expect(browser.pendingFrames).toHaveLength(1)
   })
 
+  it('builds the avatar, interaction, glow, and orbit actors as named rigs', async () => {
+    installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalled())
+
+    expect(three.groups).toHaveLength(16)
+    const root = getGroup('root')
+    const avatarRig = getGroup('avatarRig')
+    const interactionRig = getGroup('interactionRig')
+    const orbitalGroup = getGroup('orbitalGroup')
+    const glowGroup = getGroup('glowGroup')
+
+    expect(root.children).toContain(avatarRig)
+    expect(root.children).toContain(interactionRig)
+    expect(interactionRig.children).toContain(orbitalGroup)
+    expect(three.scenes[0].add).toHaveBeenCalledWith(glowGroup)
+
+    Array.from({ length: 11 }, (_, index) => {
+      const orbitRig = getGroup(`orbitRig-${index}`)
+      expect(orbitalGroup.children).toContain(orbitRig)
+      expect(orbitRig.children).toContain(three.lines[index])
+      expect(orbitRig.children).toContain(three.meshes[index + 2])
+    })
+  })
+
+  it('reuses all orbit rigs while profiles change their visibility', async () => {
+    installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalled())
+    const orbitRigs = Array.from({ length: 11 }, (_, index) =>
+      getGroup(`orbitRig-${index}`),
+    )
+    expect(orbitRigs.filter((rig) => rig.visible)).toHaveLength(11)
+    expect(three.lines).toHaveLength(11)
+
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 900,
+    })
+    act(() => window.dispatchEvent(new Event('resize')))
+
+    expect(orbitRigs.filter((rig) => rig.visible)).toHaveLength(9)
+    expect(three.lines).toHaveLength(11)
+    expect(
+      orbitRigs.every((rig, index) => rig === getGroup(`orbitRig-${index}`)),
+    ).toBe(true)
+
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 390,
+    })
+    act(() => window.dispatchEvent(new Event('orientationchange')))
+
+    expect(orbitRigs.filter((rig) => rig.visible)).toHaveLength(6)
+    expect(three.lines).toHaveLength(11)
+    expect(three.groups).toHaveLength(16)
+  })
+
+  it('applies each orbit visual weight to its line and satellite', async () => {
+    installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalled())
+
+    expect(three.lines[8].material.opacity).toBeCloseTo(0.3 * 0.84)
+    expect(three.meshes[10].scale.setScalar).toHaveBeenCalledWith(0.84)
+    expect(three.lines[10].material.opacity).toBeCloseTo(0.3 * 0.72)
+    expect(three.meshes[12].scale.setScalar).toHaveBeenCalledWith(0.72)
+  })
+
   it('renders two glow sprites before the avatar sprite', async () => {
     installControlledBrowser()
     render(<OrbitalAvatar />)
@@ -550,9 +706,10 @@ describe('OrbitalAvatar', () => {
     render(<OrbitalAvatar />)
 
     await waitFor(() => expect(three.sprites).toHaveLength(3))
-    expect(three.groups).toHaveLength(3)
+    expect(three.groups).toHaveLength(16)
 
-    const [root, , glowGroup] = three.groups
+    const root = getGroup('root')
+    const glowGroup = getGroup('glowGroup')
     const initialGlowRotation = { ...glowGroup.rotation }
     const initialGlowPosition = { ...glowGroup.position }
     const initialRootRotation = { ...root.rotation }
@@ -706,8 +863,14 @@ describe('OrbitalAvatar', () => {
     const desktopParticlePosition = three.points[0].geometry.attributes.position
     expect(desktopPosition.array).toHaveLength((96 + 1) * 3)
     expect(three.lines[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 97)
-    expect(three.lines.filter((line) => line.visible)).toHaveLength(11)
-    expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(1)
+    expect(
+      three.groups.filter(
+        (group) => group.name.startsWith('orbitRig-') && group.visible,
+      ),
+    ).toHaveLength(11)
+    expect(
+      getGroup('interactionRig').scale.setScalar,
+    ).toHaveBeenLastCalledWith(1)
     expect(three.renderers[0].setPixelRatio).toHaveBeenLastCalledWith(1.6)
     const desktopGlowSprites = [...three.sprites.slice(0, 2)]
     const desktopGlowTexture = three.dataTextures[0]
@@ -730,9 +893,16 @@ describe('OrbitalAvatar', () => {
     expect(mobilePosition).toBe(desktopPosition)
     expect(mobilePosition.array).toHaveLength((96 + 1) * 3)
     expect(three.lines[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 57)
-    expect(three.lines.filter((line) => line.visible)).toHaveLength(6)
-    expect(three.meshes.slice(2).filter((mesh) => mesh.visible)).toHaveLength(6)
-    expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(0.76)
+    expect(three.lines).toHaveLength(11)
+    expect(three.meshes).toHaveLength(13)
+    expect(
+      three.groups.filter(
+        (group) => group.name.startsWith('orbitRig-') && group.visible,
+      ),
+    ).toHaveLength(6)
+    expect(
+      getGroup('interactionRig').scale.setScalar,
+    ).toHaveBeenLastCalledWith(0.76)
     expect(three.points[0].geometry.attributes.position).toBe(
       desktopParticlePosition,
     )
@@ -771,8 +941,15 @@ describe('OrbitalAvatar', () => {
     expect(tabletPosition).toBe(desktopPosition)
     expect(tabletPosition.array).toHaveLength((96 + 1) * 3)
     expect(three.lines[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 73)
-    expect(three.lines.filter((line) => line.visible)).toHaveLength(9)
-    expect(three.groups[1].scale.setScalar).toHaveBeenLastCalledWith(0.88)
+    expect(three.lines).toHaveLength(11)
+    expect(
+      three.groups.filter(
+        (group) => group.name.startsWith('orbitRig-') && group.visible,
+      ),
+    ).toHaveLength(9)
+    expect(
+      getGroup('interactionRig').scale.setScalar,
+    ).toHaveBeenLastCalledWith(0.88)
     expect(three.points[0].geometry.attributes.position).toBe(
       desktopParticlePosition,
     )
@@ -803,7 +980,12 @@ describe('OrbitalAvatar', () => {
       coarsePointerHandler({ matches: true } as unknown as MediaQueryListEvent),
     )
 
-    expect(three.lines.filter((line) => line.visible)).toHaveLength(6)
+    expect(
+      three.groups.filter(
+        (group) => group.name.startsWith('orbitRig-') && group.visible,
+      ),
+    ).toHaveLength(6)
+    expect(three.lines).toHaveLength(11)
     expect(three.points[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 28)
     expect(windowRemoveEventListener).toHaveBeenCalledWith(
       'pointermove',

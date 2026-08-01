@@ -13,6 +13,7 @@ import {
   GLOW_TEXTURE_SIZE,
   createRadialGlowTextureData,
 } from './orbitalGlow'
+import { getOrbitMotionResponse } from './orbitalAvatarMotion'
 
 export interface OrbitalAvatarProps {
   className?: string
@@ -138,11 +139,20 @@ export default function OrbitalAvatar({
         const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100)
         camera.position.z = 5.4
         const root = new THREE.Group()
+        root.name = 'root'
+        const avatarRig = new THREE.Group()
+        avatarRig.name = 'avatarRig'
+        const interactionRig = new THREE.Group()
+        interactionRig.name = 'interactionRig'
         const orbitalGroup = new THREE.Group()
+        orbitalGroup.name = 'orbitalGroup'
         const glowGroup = new THREE.Group()
+        glowGroup.name = 'glowGroup'
         scene.add(root)
         scene.add(glowGroup)
-        root.add(orbitalGroup)
+        root.add(avatarRig)
+        root.add(interactionRig)
+        interactionRig.add(orbitalGroup)
 
         const coreGeometry = new THREE.SphereGeometry(
           1.08,
@@ -158,7 +168,7 @@ export default function OrbitalAvatar({
         })
         materials.push(coreMaterial)
         const core = new THREE.Mesh(coreGeometry, coreMaterial)
-        root.add(core)
+        avatarRig.add(core)
 
         const atmosphereGeometry = new THREE.SphereGeometry(
           1.16,
@@ -179,7 +189,7 @@ export default function OrbitalAvatar({
           atmosphereGeometry,
           atmosphereMaterial,
         )
-        root.add(atmosphere)
+        avatarRig.add(atmosphere)
 
         const glowTexture = new THREE.DataTexture(
           createRadialGlowTextureData(),
@@ -212,7 +222,11 @@ export default function OrbitalAvatar({
         })
 
         const orbits = getOrbitDefinitions()
-        const orbitActors = orbits.map((orbit) => {
+        const orbitActors = orbits.map((orbit, index) => {
+          const rig = new THREE.Group()
+          rig.name = `orbitRig-${index}`
+          orbitalGroup.add(rig)
+
           const orbitGeometry = new THREE.BufferGeometry()
           geometries.push(orbitGeometry)
           const orbitPosition = new THREE.Float32BufferAttribute(
@@ -227,13 +241,13 @@ export default function OrbitalAvatar({
             color: orbit.color,
             depthTest: true,
             depthWrite: false,
-            opacity: 0.3,
+            opacity: 0.3 * orbit.visualWeight,
             transparent: true,
           })
           materials.push(orbitMaterial)
           const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial)
           orbitLine.renderOrder = 2
-          orbitalGroup.add(orbitLine)
+          rig.add(orbitLine)
 
           const satelliteGeometry = new THREE.SphereGeometry(
             0.04,
@@ -254,14 +268,18 @@ export default function OrbitalAvatar({
             satelliteMaterial,
           )
           satellite.renderOrder = 2
-          orbitalGroup.add(satellite)
+          satellite.scale.setScalar(orbit.visualWeight)
+          rig.add(satellite)
 
           return {
             geometry: orbitGeometry,
             line: orbitLine,
             mesh: satellite,
+            motion: getOrbitMotionResponse(orbit, index),
             orbit,
             position: orbitPosition,
+            rig,
+            scratchPosition: { x: 0, y: 0, z: 0 },
           }
         })
 
@@ -291,7 +309,7 @@ export default function OrbitalAvatar({
           particleMaterial,
         )
         particleField.renderOrder = 2
-        orbitalGroup.add(particleField)
+        interactionRig.add(particleField)
 
         const pointer = { x: 0, y: 0 }
 
@@ -303,7 +321,7 @@ export default function OrbitalAvatar({
           const changed = force || nextProfile !== activeProfile
           activeProfile = nextProfile
 
-          orbitalGroup.scale.setScalar(activeProfile.orbitScale)
+          interactionRig.scale.setScalar(activeProfile.orbitScale)
           glowActors.forEach(({ definition, material, sprite }) => {
             material.opacity = definition.opacity * activeProfile.glowIntensity
             sprite.scale.set(
@@ -313,9 +331,7 @@ export default function OrbitalAvatar({
             )
           })
           orbitActors.forEach((actor, index) => {
-            const visible = index < activeProfile.orbitCount
-            actor.line.visible = visible
-            actor.mesh.visible = visible
+            actor.rig.visible = index < activeProfile.orbitCount
             if (changed) {
               const nextPositions = createOrbitPoints(
                 actor.orbit,
@@ -557,7 +573,7 @@ export default function OrbitalAvatar({
         const avatar = new THREE.Sprite(avatarMaterial)
         avatar.renderOrder = 1
         avatar.scale.set(2.12, 2.12, 1)
-        root.add(avatar)
+        avatarRig.add(avatar)
 
         const canvas = renderer.domElement
         canvas.setAttribute('aria-hidden', 'true')
