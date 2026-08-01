@@ -2,15 +2,28 @@ import { describe, expect, it } from 'vitest'
 
 import './index.css'
 
+function collectStyleRules(rules: CSSRuleList): CSSStyleRule[] {
+  return Array.from(rules).flatMap((rule) => {
+    if (rule instanceof CSSStyleRule) return [rule]
+    if ('cssRules' in rule) {
+      return collectStyleRules((rule as CSSGroupingRule).cssRules)
+    }
+    return []
+  })
+}
+
+function allStyleRules(): CSSStyleRule[] {
+  return Array.from(document.styleSheets).flatMap((sheet) =>
+    collectStyleRules(sheet.cssRules),
+  )
+}
+
 function findCssStyleRule(selector: string): CSSStyleRule | undefined {
-  return Array.from(document.styleSheets)
-    .flatMap((sheet) => Array.from(sheet.cssRules))
-    .find(
-      (rule): rule is CSSStyleRule =>
-        rule instanceof CSSStyleRule &&
-        normalizeCssWhitespace(rule.selectorText) ===
-          normalizeCssWhitespace(selector),
-    )
+  return allStyleRules().find(
+    (rule) =>
+      normalizeCssWhitespace(rule.selectorText) ===
+      normalizeCssWhitespace(selector),
+  )
 }
 
 function normalizeCssWhitespace(value: string): string {
@@ -95,5 +108,109 @@ describe('global scroll container styles', () => {
     expect(sharedRule?.style.getPropertyValue('position')).toBe('absolute')
     expect(sharedRule?.style.getPropertyValue('z-index')).toBe('-1')
     expect(sharedRule?.style.getPropertyValue('border-radius')).toBe('50%')
+  })
+
+  it('composes service card tilt from bounded custom properties', () => {
+    const cardRule = allStyleRules().find(
+      (rule) => rule.selectorText === '.spotlight-card',
+    )
+    const pseudoElementBaseRule = allStyleRules().find(
+      (rule) =>
+        rule.selectorText.includes('.spotlight-card::before') &&
+        rule.selectorText.includes('.spotlight-card::after'),
+    )
+    const beforeRule = allStyleRules().find(
+      (rule) => rule.selectorText === '.spotlight-card::before',
+    )
+    const afterRule = allStyleRules().find(
+      (rule) => rule.selectorText === '.spotlight-card::after',
+    )
+
+    expect(styleValue(cardRule, 'transform')).toContain(
+      'var(--spotlight-lift)',
+    )
+    expect(styleValue(cardRule, 'transform')).toContain(
+      'var(--spotlight-tilt-x)',
+    )
+    expect(styleValue(cardRule, 'transform')).toContain(
+      'var(--spotlight-tilt-y)',
+    )
+    expect(styleValue(beforeRule, 'background')).toContain('radial-gradient')
+    expect(styleValue(afterRule, 'background')).toContain('radial-gradient')
+    expect(styleValue(pseudoElementBaseRule, 'pointer-events')).toBe('none')
+  })
+
+  it('keeps service orbit layers decorative and behind content', () => {
+    const orbitRule = allStyleRules().find(
+      (rule) => rule.selectorText === '.service-orbit',
+    )
+    const trackRule = allStyleRules().find(
+      (rule) => rule.selectorText === '.service-orbit__track',
+    )
+    const nodeRule = allStyleRules().find(
+      (rule) => rule.selectorText === '.service-orbit__node',
+    )
+    const contentRule = allStyleRules().find(
+      (rule) => rule.selectorText === '.service-card__content',
+    )
+
+    expect(styleValue(orbitRule, 'position')).toBe('absolute')
+    expect(styleValue(orbitRule, 'pointer-events')).toBe('none')
+    expect(styleValue(trackRule, 'border-radius')).toBe('50%')
+    expect(styleValue(nodeRule, 'left')).toBe('var(--service-node-x)')
+    expect(styleValue(nodeRule, 'top')).toBe('var(--service-node-y)')
+    expect(styleValue(contentRule, 'position')).toBe('relative')
+    expect(Number(styleValue(contentRule, 'z-index'))).toBeGreaterThan(0)
+  })
+
+  it('stops service tilt and node motion for reduced motion', () => {
+    const reducedRule = Array.from(document.styleSheets)
+      .flatMap((sheet) => Array.from(sheet.cssRules))
+      .find(
+        (rule): rule is CSSMediaRule =>
+          rule instanceof CSSMediaRule &&
+          rule.conditionText === '(prefers-reduced-motion: reduce)',
+      )
+    const nestedRules = reducedRule
+      ? collectStyleRules(reducedRule.cssRules)
+      : []
+    const cardRule = nestedRules.find(
+      (rule) => rule.selectorText === '.spotlight-card',
+    )
+    const nodeRule = nestedRules.find(
+      (rule) => rule.selectorText === '.service-orbit__node > span',
+    )
+
+    expect(styleValue(cardRule, 'transform')).toBe('none')
+    expect(styleValue(cardRule, 'transition')).toBe('none')
+    expect(styleValue(nodeRule, 'animation')).toBe('none')
+  })
+
+  it('enables service motion only above the mobile breakpoint', () => {
+    const motionRule = Array.from(document.styleSheets)
+      .flatMap((sheet) => Array.from(sheet.cssRules))
+      .find(
+        (rule): rule is CSSMediaRule =>
+          rule instanceof CSSMediaRule &&
+          rule.conditionText.includes('(min-width: 640px)') &&
+          rule.conditionText.includes('(pointer: fine)') &&
+          rule.conditionText.includes(
+            '(prefers-reduced-motion: no-preference)',
+          ),
+      )
+    const nestedRules = motionRule
+      ? collectStyleRules(motionRule.cssRules)
+      : []
+    const cardRule = nestedRules.find(
+      (rule) => rule.selectorText === '.spotlight-card',
+    )
+    const nodeRule = nestedRules.find(
+      (rule) => rule.selectorText === '.service-orbit__node > span',
+    )
+
+    expect(styleValue(cardRule, 'transition')).toContain('transform')
+    expect(styleValue(nodeRule, 'animation')).toContain(
+      'service-orbit-node-drift',
+    )
   })
 })
