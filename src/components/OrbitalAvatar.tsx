@@ -16,8 +16,10 @@ import {
 import {
   createOrbitalMotionState,
   getOrbitMotionResponse,
+  resolveOrbitalDragIntent,
   stepOrbitalMotion,
   writeOrbitRigRotation,
+  type OrbitalDragIntent,
   type OrbitalMotionState,
 } from './orbitalAvatarMotion'
 
@@ -51,6 +53,11 @@ export default function OrbitalAvatar({
     const currentContainer = containerRef.current
     if (!currentContainer) return
     const container: HTMLDivElement = currentContainer
+    Object.assign(container.style, {
+      cursor: '',
+      pointerEvents: 'none',
+      touchAction: '',
+    })
 
     let cancelled = false
     let disposeScene = () => undefined
@@ -105,17 +112,74 @@ export default function OrbitalAvatar({
         let prefersReducedMotion = reducedMotionQuery.matches
         let intersectsViewport = true
         let readySignalled = false
-        let pointerListenerAttached = false
         let motionState: OrbitalMotionState = createOrbitalMotionState()
         let lastFrameTime: number | null = null
         let dragDeltaX = 0
         let dragDeltaY = 0
         let dragging = false
         let cancelMomentum = false
+        interface ActiveDrag {
+          readonly pointerId: number
+          readonly pointerType: string
+          readonly startX: number
+          readonly startY: number
+          lastX: number
+          lastY: number
+          intent: OrbitalDragIntent
+        }
+        let activeDrag: ActiveDrag | null = null
+        let activeDragHasCapture = false
+        let releaseAfterFrame = false
+        let interactionListenersAttached = false
+        let syncInteractionListeners = () => undefined
         const pointer = { x: 0, y: 0 }
         let avatarMaterial: import('three').SpriteMaterial | null = null
         const resetFrameClock = () => {
           lastFrameTime = null
+        }
+        const canInteract = () =>
+          sceneReady &&
+          !disposed &&
+          !prefersReducedMotion &&
+          intersectsViewport &&
+          !document.hidden
+        const releaseCapture = (pointerId: number) => {
+          try {
+            if (container.hasPointerCapture?.(pointerId)) {
+              container.releasePointerCapture(pointerId)
+            }
+          } catch {
+            // Pointer capture may already have been released by the browser.
+          }
+        }
+        const finishDrag = (preserveMomentum: boolean) => {
+          const finishedDrag = activeDrag
+          activeDrag = null
+          activeDragHasCapture = false
+
+          if (preserveMomentum) {
+            if (dragDeltaX !== 0 || dragDeltaY !== 0) {
+              releaseAfterFrame = true
+              dragging = true
+            } else {
+              releaseAfterFrame = false
+              dragging = false
+            }
+          } else {
+            releaseAfterFrame = false
+            dragging = false
+            dragDeltaX = 0
+            dragDeltaY = 0
+            cancelMomentum = true
+          }
+
+          if (canInteract()) {
+            container.style.cursor =
+              finePointerQuery.matches && !coarsePointerQuery.matches
+                ? 'grab'
+                : 'default'
+          }
+          if (finishedDrag) releaseCapture(finishedDrag.pointerId)
         }
 
         renderer = new THREE.WebGLRenderer({
@@ -134,7 +198,15 @@ export default function OrbitalAvatar({
           }
           disposeSafely(() => resizeObserver?.disconnect())
           disposeSafely(() => intersectionObserver?.disconnect())
+          disposeSafely(syncInteractionListeners)
           removeListeners.splice(0).forEach(disposeSafely)
+          finishDrag(false)
+          interactionListenersAttached = false
+          Object.assign(container.style, {
+            cursor: '',
+            pointerEvents: 'none',
+            touchAction: '',
+          })
           textures.splice(0).forEach((texture) =>
             disposeSafely(() => texture.dispose()),
           )
@@ -387,8 +459,6 @@ export default function OrbitalAvatar({
 
         applySceneProfile(activeProfile, true)
 
-        let syncPointerListener = () => undefined
-
         const renderFrame = (time: number) => {
           if (disposed || !renderer) return
           const deltaMs =
@@ -413,6 +483,10 @@ export default function OrbitalAvatar({
           dragDeltaX = 0
           dragDeltaY = 0
           cancelMomentum = false
+          if (releaseAfterFrame) {
+            releaseAfterFrame = false
+            dragging = false
+          }
           const animationSeconds = motionState.elapsedSeconds
 
           orbitActors.forEach((actor, index) => {
@@ -468,13 +542,13 @@ export default function OrbitalAvatar({
 
         const resize = () => {
           if (disposed || !renderer) return
-          applySceneProfile(
-            getOrbitalSceneProfile({
-              coarsePointer: coarsePointerQuery.matches,
-              width: window.innerWidth,
-            }),
-          )
-          syncPointerListener()
+          const nextProfile = getOrbitalSceneProfile({
+            coarsePointer: coarsePointerQuery.matches,
+            width: window.innerWidth,
+          })
+          if (nextProfile !== activeProfile) finishDrag(false)
+          applySceneProfile(nextProfile)
+          syncInteractionListeners()
           const width = Math.max(1, container.clientWidth)
           const height = Math.max(1, container.clientHeight)
           camera.aspect = width / height
@@ -530,62 +604,159 @@ export default function OrbitalAvatar({
         }
         const handleVisibilityChange = () => {
           try {
-            syncPointerListener()
+            syncInteractionListeners()
             refreshLoop()
           } catch {
             failScene()
           }
         }
-        const handlePointerMove = (event: PointerEvent) => {
-          if (
-            disposed ||
-            prefersReducedMotion ||
-            !activeProfile.allowPointerParallax ||
-            !finePointerQuery.matches ||
-            coarsePointerQuery.matches ||
-            !intersectsViewport ||
-            document.hidden
-          ) {
-            return
+        const handlePointerDown = (event: PointerEvent) => {
+          if (!canInteract() || !event.isPrimary || activeDrag) return
+
+          const coarsePointer =
+            coarsePointerQuery.matches || event.pointerType === 'touch'
+          cancelMomentum = false
+          releaseAfterFrame = false
+          activeDrag = {
+            intent: coarsePointer ? 'pending' : 'scene',
+            lastX: event.clientX,
+            lastY: event.clientY,
+            pointerId: event.pointerId,
+            pointerType: event.pointerType,
+            startX: event.clientX,
+            startY: event.clientY,
           }
+          dragging = !coarsePointer
+          activeDragHasCapture = false
+          try {
+            if (container.setPointerCapture) {
+              container.setPointerCapture(event.pointerId)
+              activeDragHasCapture = true
+            }
+          } catch {
+            // Interaction can continue even when capture is unavailable.
+          }
+          if (!coarsePointer && event.pointerType !== 'touch') {
+            container.style.cursor = 'grabbing'
+          }
+        }
+        const handlePointerMove = (event: PointerEvent) => {
+          if (!canInteract()) return
 
           try {
             const bounds = container.getBoundingClientRect()
             const width = Math.max(1, bounds.width)
             const height = Math.max(1, bounds.height)
-            pointer.x = ((event.clientX - bounds.left) / width - 0.5) * 2
-            pointer.y = ((event.clientY - bounds.top) / height - 0.5) * 2
+            const drag = activeDrag
+            if (drag && drag.pointerId === event.pointerId) {
+              const coarsePointer =
+                coarsePointerQuery.matches || drag.pointerType === 'touch'
+              drag.intent = resolveOrbitalDragIntent({
+                coarsePointer,
+                deltaX: event.clientX - drag.startX,
+                deltaY: event.clientY - drag.startY,
+              })
+              if (drag.intent === 'scroll') {
+                finishDrag(false)
+                return
+              }
+              if (drag.intent === 'scene') {
+                dragDeltaX += (event.clientX - drag.lastX) / width
+                dragDeltaY += (event.clientY - drag.lastY) / height
+                drag.lastX = event.clientX
+                drag.lastY = event.clientY
+                dragging = true
+                event.preventDefault()
+              }
+              return
+            }
+
+            if (
+              drag ||
+              !activeProfile.allowPointerParallax ||
+              !finePointerQuery.matches ||
+              coarsePointerQuery.matches ||
+              event.pointerType === 'touch'
+            ) {
+              return
+            }
+            pointer.x = Math.min(
+              1,
+              Math.max(-1, ((event.clientX - bounds.left) / width - 0.5) * 2),
+            )
+            pointer.y = Math.min(
+              1,
+              Math.max(-1, ((event.clientY - bounds.top) / height - 0.5) * 2),
+            )
           } catch {
             failScene()
           }
         }
-        syncPointerListener = () => {
-          const shouldListen =
-            sceneReady &&
-            !disposed &&
-            !prefersReducedMotion &&
-            intersectsViewport &&
-            !document.hidden &&
-            activeProfile.allowPointerParallax &&
-            finePointerQuery.matches &&
-            !coarsePointerQuery.matches
-
-          if (shouldListen && !pointerListenerAttached) {
-            window.addEventListener('pointermove', handlePointerMove)
-            pointerListenerAttached = true
-          } else if (!shouldListen && pointerListenerAttached) {
-            window.removeEventListener('pointermove', handlePointerMove)
-            pointerListenerAttached = false
-          }
-
-          if (!shouldListen) {
+        const handlePointerUp = (event: PointerEvent) => {
+          if (activeDrag?.pointerId !== event.pointerId) return
+          finishDrag(activeDrag.intent === 'scene')
+        }
+        const handlePointerCancel = (event: PointerEvent) => {
+          if (activeDrag?.pointerId !== event.pointerId) return
+          finishDrag(false)
+        }
+        const handleLostPointerCapture = (event: PointerEvent) => {
+          if (activeDrag?.pointerId !== event.pointerId) return
+          finishDrag(false)
+        }
+        const handlePointerLeave = () => {
+          if (activeDrag && !activeDragHasCapture) {
+            finishDrag(false)
+          } else if (!activeDrag) {
             pointer.x = 0
             pointer.y = 0
           }
         }
+        const interactionHandlers: Array<readonly [string, EventListener]> = [
+          ['pointerdown', handlePointerDown as EventListener],
+          ['pointermove', handlePointerMove as EventListener],
+          ['pointerup', handlePointerUp as EventListener],
+          ['pointercancel', handlePointerCancel as EventListener],
+          ['lostpointercapture', handleLostPointerCapture as EventListener],
+          ['pointerleave', handlePointerLeave as EventListener],
+        ]
+        syncInteractionListeners = () => {
+          if (canInteract()) {
+            if (!interactionListenersAttached) {
+              interactionHandlers.forEach(([type, handler]) =>
+                container.addEventListener(type, handler),
+              )
+              interactionListenersAttached = true
+            }
+            container.style.pointerEvents = 'auto'
+            container.style.touchAction = 'pan-y'
+            if (!activeDrag) {
+              container.style.cursor =
+                finePointerQuery.matches && !coarsePointerQuery.matches
+                  ? 'grab'
+                  : 'default'
+            }
+            return
+          }
+
+          if (interactionListenersAttached) {
+            interactionHandlers.forEach(([type, handler]) =>
+              container.removeEventListener(type, handler),
+            )
+            interactionListenersAttached = false
+          }
+          finishDrag(false)
+          pointer.x = 0
+          pointer.y = 0
+          container.style.pointerEvents = 'none'
+          container.style.touchAction = ''
+          container.style.cursor = ''
+        }
         const handleReducedMotionChange = (event: MediaQueryListEvent) => {
           try {
+            finishDrag(false)
             prefersReducedMotion = event.matches
+            syncInteractionListeners()
             if (prefersReducedMotion) {
               motionState = createOrbitalMotionState()
               pointer.x = 0
@@ -596,7 +767,6 @@ export default function OrbitalAvatar({
               cancelMomentum = false
               resetFrameClock()
             }
-            syncPointerListener()
             refreshLoop()
             if (prefersReducedMotion) renderFrame(0)
           } catch {
@@ -605,12 +775,14 @@ export default function OrbitalAvatar({
         }
         const handleFinePointerChange = () => {
           try {
-            syncPointerListener()
+            finishDrag(false)
+            syncInteractionListeners()
           } catch {
             failScene()
           }
         }
         const handleCoarsePointerChange = () => {
+          finishDrag(false)
           safelyResize()
         }
 
@@ -705,13 +877,7 @@ export default function OrbitalAvatar({
             handleCoarsePointerChange,
           ),
         )
-        removeListeners.push(() => {
-          if (pointerListenerAttached) {
-            window.removeEventListener('pointermove', handlePointerMove)
-            pointerListenerAttached = false
-          }
-        })
-        syncPointerListener()
+        syncInteractionListeners()
 
         if (typeof ResizeObserver !== 'undefined') {
           resizeObserver = new ResizeObserver(safelyResize)
@@ -721,7 +887,7 @@ export default function OrbitalAvatar({
           intersectionObserver = new IntersectionObserver((entries) => {
             try {
               intersectsViewport = entries.some((entry) => entry.isIntersecting)
-              syncPointerListener()
+              syncInteractionListeners()
               refreshLoop()
             } catch {
               failScene()

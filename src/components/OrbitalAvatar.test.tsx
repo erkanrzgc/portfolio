@@ -528,6 +528,68 @@ function runNextFrame(browser: ControlledBrowser, time: number) {
   act(() => callback(time))
 }
 
+function createPointerEvent(
+  type: string,
+  {
+    clientX = 0,
+    clientY = 0,
+    isPrimary = true,
+    pointerId = 1,
+    pointerType = 'mouse',
+  }: Partial<Pick<PointerEvent,
+    'clientX' | 'clientY' | 'isPrimary' | 'pointerId' | 'pointerType'
+  >> = {},
+) {
+  const event = new Event(type, { bubbles: true, cancelable: true })
+  Object.defineProperties(event, {
+    clientX: { value: clientX },
+    clientY: { value: clientY },
+    isPrimary: { value: isPrimary },
+    pointerId: { value: pointerId },
+    pointerType: { value: pointerType },
+  })
+  return event as PointerEvent
+}
+
+function mockWrapperBounds(wrapper: HTMLDivElement) {
+  vi.spyOn(wrapper, 'getBoundingClientRect').mockReturnValue({
+    bottom: 600,
+    height: 400,
+    left: 100,
+    right: 700,
+    top: 200,
+    width: 600,
+    x: 100,
+    y: 200,
+    toJSON: () => undefined,
+  })
+}
+
+function installPointerCapture(
+  wrapper: HTMLDivElement,
+  { dispatchLostSynchronously = false } = {},
+) {
+  const capturedPointers = new Set<number>()
+  const setPointerCapture = vi.fn((pointerId: number) => {
+    capturedPointers.add(pointerId)
+  })
+  const hasPointerCapture = vi.fn((pointerId: number) =>
+    capturedPointers.has(pointerId),
+  )
+  const releasePointerCapture = vi.fn((pointerId: number) => {
+    capturedPointers.delete(pointerId)
+    if (dispatchLostSynchronously) {
+      wrapper.dispatchEvent(createPointerEvent('lostpointercapture', { pointerId }))
+    }
+  })
+  Object.defineProperties(wrapper, {
+    hasPointerCapture: { configurable: true, value: hasPointerCapture },
+    releasePointerCapture: { configurable: true, value: releasePointerCapture },
+    setPointerCapture: { configurable: true, value: setPointerCapture },
+  })
+  return { hasPointerCapture, releasePointerCapture, setPointerCapture }
+}
+
 beforeEach(() => {
   three.failRender = false
   three.failRenderer = false
@@ -698,17 +760,7 @@ describe('OrbitalAvatar', () => {
 
     await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
     const wrapper = rendered.container.firstElementChild as HTMLDivElement
-    vi.spyOn(wrapper, 'getBoundingClientRect').mockReturnValue({
-      bottom: 600,
-      height: 400,
-      left: 100,
-      right: 700,
-      top: 200,
-      width: 600,
-      x: 100,
-      y: 200,
-      toJSON: () => undefined,
-    })
+    mockWrapperBounds(wrapper)
     const interactionRig = getGroup('interactionRig')
     const avatarRig = getGroup('avatarRig')
     const glowGroup = getGroup('glowGroup')
@@ -718,9 +770,12 @@ describe('OrbitalAvatar', () => {
     const initialGlowRotation = { ...glowGroup.rotation }
     const initialOrbitRotation = { ...orbitRig.rotation }
     act(() =>
-      window.dispatchEvent(
-        new MouseEvent('pointermove', { clientX: 700, clientY: 400 }),
-      ),
+      wrapper.dispatchEvent(createPointerEvent('pointermove', {
+        clientX: 700,
+        clientY: 400,
+        pointerId: 99,
+        pointerType: 'mouse',
+      })),
     )
     runNextFrame(browser, 1016)
 
@@ -734,6 +789,353 @@ describe('OrbitalAvatar', () => {
     expect(glowGroup.position.y).toBe(avatarRig.position.y)
     expect(glowGroup.rotation).toEqual(initialGlowRotation)
     expect(browser.pendingFrames).toHaveLength(1)
+  })
+
+  it('preserves a fine-pointer flick released before the next frame', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    mockWrapperBounds(wrapper)
+    const capture = installPointerCapture(wrapper)
+    const interactionRig = getGroup('interactionRig')
+    runNextFrame(browser, 1000)
+
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+        clientX: 400,
+        clientY: 400,
+        pointerId: 7,
+        pointerType: 'mouse',
+      }))
+      wrapper.dispatchEvent(createPointerEvent('pointermove', {
+        clientX: 520,
+        clientY: 360,
+        pointerId: 7,
+        pointerType: 'mouse',
+      }))
+      wrapper.dispatchEvent(createPointerEvent('pointerup', {
+        clientX: 520,
+        clientY: 360,
+        pointerId: 7,
+        pointerType: 'mouse',
+      }))
+    })
+
+    expect(capture.setPointerCapture).toHaveBeenCalledWith(7)
+    expect(capture.releasePointerCapture).toHaveBeenCalledWith(7)
+    runNextFrame(browser, 1016)
+    const releasedYaw = interactionRig.rotation.y
+    runNextFrame(browser, 1032)
+    expect(Math.abs(interactionRig.rotation.y - releasedYaw)).toBeGreaterThan(
+      0.016 * 0.025,
+    )
+  })
+
+  it('keeps vertical touch intent native and applies horizontal touch momentum', async () => {
+    const browser = installControlledBrowser({ coarsePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    mockWrapperBounds(wrapper)
+    const capture = installPointerCapture(wrapper)
+    const interactionRig = getGroup('interactionRig')
+    runNextFrame(browser, 1000)
+    const beforeVertical = interactionRig.rotation.y
+
+    const verticalMove = createPointerEvent('pointermove', {
+      clientX: 406,
+      clientY: 440,
+      pointerId: 8,
+      pointerType: 'touch',
+    })
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+        clientX: 400,
+        clientY: 400,
+        pointerId: 8,
+        pointerType: 'touch',
+      }))
+      wrapper.dispatchEvent(verticalMove)
+      wrapper.dispatchEvent(createPointerEvent('pointerup', {
+        clientX: 406,
+        clientY: 440,
+        pointerId: 8,
+        pointerType: 'touch',
+      }))
+    })
+
+    expect(verticalMove.defaultPrevented).toBe(false)
+    expect(capture.releasePointerCapture).toHaveBeenCalledWith(8)
+    runNextFrame(browser, 1016)
+    expect(interactionRig.rotation.y - beforeVertical).toBeCloseTo(
+      0.016 * 0.025,
+      8,
+    )
+
+    const horizontalMove = createPointerEvent('pointermove', {
+      clientX: 450,
+      clientY: 406,
+      pointerId: 9,
+      pointerType: 'touch',
+    })
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+        clientX: 400,
+        clientY: 400,
+        pointerId: 9,
+        pointerType: 'touch',
+      }))
+      wrapper.dispatchEvent(horizontalMove)
+      wrapper.dispatchEvent(createPointerEvent('pointerup', {
+        clientX: 450,
+        clientY: 406,
+        pointerId: 9,
+        pointerType: 'touch',
+      }))
+    })
+
+    expect(horizontalMove.defaultPrevented).toBe(true)
+    runNextFrame(browser, 1032)
+    const releasedYaw = interactionRig.rotation.y
+    runNextFrame(browser, 1048)
+    expect(Math.abs(interactionRig.rotation.y - releasedYaw)).toBeGreaterThan(
+      0.016 * 0.025,
+    )
+  })
+
+  it('clears stale cancellation when a new drag starts before the next frame', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    mockWrapperBounds(wrapper)
+    const capture = installPointerCapture(wrapper)
+    const interactionRig = getGroup('interactionRig')
+    runNextFrame(browser, 1000)
+
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+        clientX: 400,
+        clientY: 400,
+        pointerId: 12,
+      }))
+      wrapper.dispatchEvent(createPointerEvent('pointercancel', {
+        clientX: 400,
+        clientY: 400,
+        pointerId: 12,
+      }))
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+        clientX: 400,
+        clientY: 400,
+        pointerId: 13,
+      }))
+      wrapper.dispatchEvent(createPointerEvent('pointermove', {
+        clientX: 490,
+        clientY: 400,
+        pointerId: 13,
+      }))
+      wrapper.dispatchEvent(createPointerEvent('pointerup', {
+        clientX: 490,
+        clientY: 400,
+        pointerId: 13,
+      }))
+    })
+
+    expect(capture.setPointerCapture).toHaveBeenNthCalledWith(1, 12)
+    expect(capture.setPointerCapture).toHaveBeenNthCalledWith(2, 13)
+    runNextFrame(browser, 1016)
+    const releasedYaw = interactionRig.rotation.y
+    runNextFrame(browser, 1032)
+    expect(Math.abs(interactionRig.rotation.y - releasedYaw)).toBeGreaterThan(
+      0.016 * 0.025,
+    )
+  })
+
+  it('cancels capture on pointer cancellation, visibility, loss, and profile changes', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    mockWrapperBounds(wrapper)
+    const capture = installPointerCapture(wrapper, {
+      dispatchLostSynchronously: true,
+    })
+    runNextFrame(browser, 1000)
+
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 20 }))
+      wrapper.dispatchEvent(createPointerEvent('pointercancel', { pointerId: 20 }))
+    })
+    expect(capture.releasePointerCapture).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 21 }))
+      Object.defineProperty(document, 'hidden', {
+        configurable: true,
+        value: true,
+      })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(capture.releasePointerCapture).toHaveBeenCalledTimes(2)
+
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: false,
+    })
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 22 }))
+      wrapper.dispatchEvent(createPointerEvent('lostpointercapture', {
+        pointerId: 22,
+      }))
+    })
+    expect(capture.releasePointerCapture).toHaveBeenCalledTimes(3)
+
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 23 }))
+      const coarseMedia = browser.media.get('(pointer: coarse)')!
+      coarseMedia.matches = true
+      const handler = coarseMedia.addEventListener.mock.calls.find(
+        ([type]) => type === 'change',
+      )?.[1] as EventListener
+      handler({ matches: true } as unknown as MediaQueryListEvent)
+    })
+    expect(capture.releasePointerCapture).toHaveBeenCalledTimes(4)
+  })
+
+  it('cancels an uncaptured drag when the pointer leaves the surface', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    mockWrapperBounds(wrapper)
+    Object.defineProperty(wrapper, 'setPointerCapture', {
+      configurable: true,
+      value: vi.fn(() => {
+        throw new Error('capture unavailable')
+      }),
+    })
+    runNextFrame(browser, 1000)
+
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 40 }))
+      wrapper.dispatchEvent(createPointerEvent('pointerleave', { pointerId: 40 }))
+    })
+
+    const capture = installPointerCapture(wrapper)
+    act(() => wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+      pointerId: 41,
+    })))
+    expect(capture.setPointerCapture).toHaveBeenCalledWith(41)
+  })
+
+  it('exposes interaction styles only for a ready interactive scene', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+
+    expect(wrapper.style.pointerEvents).toBe('none')
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const capture = installPointerCapture(wrapper)
+    expect(wrapper.style.pointerEvents).toBe('auto')
+    expect(wrapper.style.touchAction).toBe('pan-y')
+    expect(wrapper.style.cursor).toBe('grab')
+
+    act(() => wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+      pointerId: 31,
+      pointerType: 'mouse',
+    })))
+    expect(wrapper.style.cursor).toBe('grabbing')
+    act(() => wrapper.dispatchEvent(createPointerEvent('pointerup', {
+      pointerId: 31,
+      pointerType: 'mouse',
+    })))
+    expect(wrapper.style.cursor).toBe('grab')
+
+    act(() => wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+      pointerId: 32,
+      pointerType: 'mouse',
+    })))
+
+    rendered.unmount()
+    expect(capture.releasePointerCapture).toHaveBeenCalledWith(32)
+    expect(wrapper.style.pointerEvents).toBe('none')
+    expect(wrapper.style.touchAction).toBe('')
+    expect(wrapper.style.cursor).toBe('')
+  })
+
+  it('keeps reduced-motion and failed scenes noninteractive', async () => {
+    installControlledBrowser({ reducedMotion: true })
+    const reduced = render(<OrbitalAvatar />)
+    const reducedWrapper = reduced.container.firstElementChild as HTMLDivElement
+    await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalled())
+    expect(reducedWrapper.style.pointerEvents).toBe('none')
+    expect(reducedWrapper.style.touchAction).toBe('')
+    expect(reducedWrapper.style.cursor).toBe('')
+    reduced.unmount()
+
+    installControlledBrowser()
+    three.failRenderer = true
+    const failed = render(<OrbitalAvatar />)
+    const failedWrapper = failed.container.firstElementChild as HTMLDivElement
+    await act(async () => undefined)
+    expect(failedWrapper).toHaveClass('pointer-events-none')
+    expect(failedWrapper.style.pointerEvents).toBe('none')
+  })
+
+  it('attaches ready container listeners once and removes the original callbacks', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    three.textureResult = 'pending'
+    const windowAddEventListener = vi.spyOn(window, 'addEventListener')
+    const rendered = render(<OrbitalAvatar />)
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    const addEventListener = vi.spyOn(wrapper, 'addEventListener')
+    const removeEventListener = vi.spyOn(wrapper, 'removeEventListener')
+    const interactionTypes = [
+      'pointerdown',
+      'pointermove',
+      'pointerup',
+      'pointercancel',
+      'lostpointercapture',
+      'pointerleave',
+    ]
+
+    await waitFor(() => expect(three.textureRequests).toHaveLength(1))
+    expect(
+      addEventListener.mock.calls.filter(([type]) =>
+        interactionTypes.includes(type),
+      ),
+    ).toHaveLength(0)
+    await act(async () => three.textureRequests[0].onLoad(three.textures[0]))
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const attached = addEventListener.mock.calls.filter(([type]) =>
+      interactionTypes.includes(type),
+    )
+    expect(attached.map(([type]) => type)).toEqual(interactionTypes)
+    expect(
+      windowAddEventListener.mock.calls.filter(([type]) => type === 'pointermove'),
+    ).toHaveLength(0)
+
+    act(() => window.dispatchEvent(new Event('resize')))
+    act(() => window.dispatchEvent(new Event('resize')))
+    expect(
+      addEventListener.mock.calls.filter(([type]) =>
+        interactionTypes.includes(type),
+      ),
+    ).toHaveLength(interactionTypes.length)
+
+    rendered.unmount()
+    interactionTypes.forEach((type) => {
+      const callback = attached.find(([attachedType]) => attachedType === type)?.[1]
+      expect(removeEventListener).toHaveBeenCalledTimes(interactionTypes.length)
+      expect(removeEventListener).toHaveBeenCalledWith(type, callback)
+    })
   })
 
   it('resumes animation without integrating time spent while paused', async () => {
@@ -978,8 +1380,6 @@ describe('OrbitalAvatar', () => {
 
   it('reapplies mobile and tablet workloads after orientation or breakpoint changes', async () => {
     const browser = installControlledBrowser({ finePointer: true })
-    const windowAddEventListener = vi.spyOn(window, 'addEventListener')
-    const windowRemoveEventListener = vi.spyOn(window, 'removeEventListener')
     Object.defineProperty(window, 'devicePixelRatio', {
       configurable: true,
       value: 2,
@@ -1054,11 +1454,6 @@ describe('OrbitalAvatar', () => {
       )
       expect(glow.material.opacity).toBeCloseTo(definition.opacity * 0.7)
     })
-    expect(windowRemoveEventListener).toHaveBeenCalledWith(
-      'pointermove',
-      expect.any(Function),
-    )
-
     Object.defineProperty(window, 'innerWidth', {
       configurable: true,
       value: 900,
@@ -1085,14 +1480,10 @@ describe('OrbitalAvatar', () => {
     )
     expect(three.points[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 56)
     expect(three.renderers[0].setPixelRatio).toHaveBeenLastCalledWith(1.35)
-    expect(
-      windowAddEventListener.mock.calls.filter(([type]) => type === 'pointermove'),
-    ).toHaveLength(2)
   })
 
   it('downgrades a wide scene when the pointer becomes coarse', async () => {
     const browser = installControlledBrowser({ finePointer: true })
-    const windowRemoveEventListener = vi.spyOn(window, 'removeEventListener')
     render(<OrbitalAvatar />)
 
     await waitFor(() =>
@@ -1117,10 +1508,6 @@ describe('OrbitalAvatar', () => {
     ).toHaveLength(6)
     expect(three.lines).toHaveLength(11)
     expect(three.points[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 28)
-    expect(windowRemoveEventListener).toHaveBeenCalledWith(
-      'pointermove',
-      expect.any(Function),
-    )
   })
 
   it('removes a failed scene and signals unavailability once after readiness', async () => {
@@ -1222,9 +1609,6 @@ describe('OrbitalAvatar', () => {
     const orientationHandler = windowAddEventListener.mock.calls.find(
       ([type]) => type === 'orientationchange',
     )?.[1]
-    const pointerHandler = windowAddEventListener.mock.calls.find(
-      ([type]) => type === 'pointermove',
-    )?.[1]
     const visibilityHandler = documentAddEventListener.mock.calls.find(
       ([type]) => type === 'visibilitychange',
     )?.[1]
@@ -1267,10 +1651,6 @@ describe('OrbitalAvatar', () => {
     expect(windowRemoveEventListener).toHaveBeenCalledWith(
       'orientationchange',
       orientationHandler,
-    )
-    expect(windowRemoveEventListener).toHaveBeenCalledWith(
-      'pointermove',
-      pointerHandler,
     )
     expect(documentRemoveEventListener).toHaveBeenCalledWith(
       'visibilitychange',
@@ -1326,17 +1706,7 @@ describe('OrbitalAvatar', () => {
 
     await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
     const wrapper = rendered.container.firstElementChild as HTMLDivElement
-    vi.spyOn(wrapper, 'getBoundingClientRect').mockReturnValue({
-      bottom: 600,
-      height: 400,
-      left: 100,
-      right: 700,
-      top: 200,
-      width: 600,
-      x: 100,
-      y: 200,
-      toJSON: () => undefined,
-    })
+    mockWrapperBounds(wrapper)
     const interactionRig = getGroup('interactionRig')
     const avatarRig = getGroup('avatarRig')
     const glowGroup = getGroup('glowGroup')
@@ -1345,9 +1715,12 @@ describe('OrbitalAvatar', () => {
 
     runNextFrame(browser, 1000)
     act(() =>
-      window.dispatchEvent(
-        new MouseEvent('pointermove', { clientX: 700, clientY: 400 }),
-      ),
+      wrapper.dispatchEvent(createPointerEvent('pointermove', {
+        clientX: 700,
+        clientY: 400,
+        pointerId: 99,
+        pointerType: 'mouse',
+      })),
     )
     runNextFrame(browser, 1016)
     expect(interactionRig.rotation.y).not.toBe(0)
@@ -1571,9 +1944,10 @@ describe('OrbitalAvatar', () => {
       ),
     )
     act(() =>
-      window.dispatchEvent(
-        new MouseEvent('pointermove', { clientX: 10, clientY: 10 }),
-      ),
+      wrapper.dispatchEvent(createPointerEvent('pointermove', {
+        clientX: 10,
+        clientY: 10,
+      })),
     )
 
     act(() =>
@@ -1587,9 +1961,10 @@ describe('OrbitalAvatar', () => {
       value: true,
     })
     act(() =>
-      window.dispatchEvent(
-        new MouseEvent('pointermove', { clientX: 20, clientY: 20 }),
-      ),
+      wrapper.dispatchEvent(createPointerEvent('pointermove', {
+        clientX: 20,
+        clientY: 20,
+      })),
     )
 
     expect(getBoundingClientRect).not.toHaveBeenCalled()
