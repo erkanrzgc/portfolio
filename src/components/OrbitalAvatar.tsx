@@ -139,7 +139,9 @@ export default function OrbitalAvatar({
         camera.position.z = 5.4
         const root = new THREE.Group()
         const orbitalGroup = new THREE.Group()
+        const glowGroup = new THREE.Group()
         scene.add(root)
+        scene.add(glowGroup)
         root.add(orbitalGroup)
 
         const coreGeometry = new THREE.SphereGeometry(
@@ -205,7 +207,7 @@ export default function OrbitalAvatar({
           const sprite = new THREE.Sprite(material)
           sprite.position.set(0, 0, definition.z)
           sprite.renderOrder = 0
-          root.add(sprite)
+          glowGroup.add(sprite)
           return { definition, material, sprite }
         })
 

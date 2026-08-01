@@ -13,7 +13,7 @@ const three = vi.hoisted(() => {
     failRenderer: false,
     rendererConstructor: vi.fn(),
     rendererMethodFailure: null as 'setClearColor' | 'setPixelRatio' | null,
-    textureResult: 'success' as 'success' | 'failure',
+    textureResult: 'success' as 'success' | 'failure' | 'pending',
     renderers: [] as Array<{
       domElement: HTMLCanvasElement
       dispose: ReturnType<typeof vi.fn>
@@ -25,6 +25,10 @@ const three = vi.hoisted(() => {
     textures: [] as Array<{
       colorSpace?: unknown
       dispose: ReturnType<typeof vi.fn>
+    }>,
+    textureRequests: [] as Array<{
+      onError?: (error: unknown) => void
+      onLoad: (texture: { dispose: ReturnType<typeof vi.fn> }) => void
     }>,
     dataTextures: [] as Array<{
       data: Uint8Array
@@ -64,7 +68,12 @@ const three = vi.hoisted(() => {
       scale: { setScalar: ReturnType<typeof vi.fn> }
       visible: boolean
     }>,
+    scenes: [] as Array<{
+      add: ReturnType<typeof vi.fn>
+    }>,
     groups: [] as Array<{
+      add: ReturnType<typeof vi.fn>
+      position: { x: number; y: number; z: number }
       rotation: { x: number; y: number; z: number }
       scale: { setScalar: ReturnType<typeof vi.fn> }
     }>,
@@ -157,7 +166,9 @@ vi.mock('three', () => {
     },
     LinearFilter: 'linear',
     Group: class {
-      add = vi.fn()
+      children: unknown[] = []
+      add = vi.fn((child: unknown) => this.children.push(child))
+      position = { x: 0, y: 0, z: 0 }
       rotation = { x: 0, y: 0, z: 0 }
       scale = { setScalar: vi.fn() }
 
@@ -200,7 +211,12 @@ vi.mock('three', () => {
       updateProjectionMatrix = vi.fn()
     },
     Scene: class {
-      add = vi.fn()
+      children: unknown[] = []
+      add = vi.fn((child: unknown) => this.children.push(child))
+
+      constructor() {
+        three.scenes.push(this)
+      }
     },
     Points: class {
       renderOrder = 0
@@ -250,6 +266,8 @@ vi.mock('three', () => {
       ) {
         const texture = { dispose: vi.fn() }
         three.textures.push(texture)
+        three.textureRequests.push({ onError, onLoad })
+        if (three.textureResult === 'pending') return texture
         queueMicrotask(() => {
           if (three.textureResult === 'failure') {
             onError?.(new Error('texture failed'))
@@ -406,12 +424,14 @@ beforeEach(() => {
   three.textureResult = 'success'
   three.renderers.length = 0
   three.textures.length = 0
+  three.textureRequests.length = 0
   three.dataTextures.length = 0
   three.geometries.length = 0
   three.bufferGeometries.length = 0
   three.materials.length = 0
   three.lines.length = 0
   three.meshes.length = 0
+  three.scenes.length = 0
   three.groups.length = 0
   three.points.length = 0
   three.sphereGeometries.length = 0
@@ -523,6 +543,32 @@ describe('OrbitalAvatar', () => {
         1,
       )
     })
+  })
+
+  it('keeps glow sprites in a non-rotating scene group behind the avatar', async () => {
+    const browser = installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(three.sprites).toHaveLength(3))
+    expect(three.groups).toHaveLength(3)
+
+    const [root, , glowGroup] = three.groups
+    const initialGlowRotation = { ...glowGroup.rotation }
+    const initialGlowPosition = { ...glowGroup.position }
+    const initialRootRotation = { ...root.rotation }
+    expect(three.scenes[0].add).toHaveBeenCalledWith(glowGroup)
+    GLOW_LAYERS.forEach((_definition, index) => {
+      expect(glowGroup.add).toHaveBeenCalledWith(three.sprites[index])
+      expect(root.add).not.toHaveBeenCalledWith(three.sprites[index])
+    })
+
+    const [frameId, frame] = [...browser.pendingFrames.entries()][0]
+    browser.pendingFrames.delete(frameId)
+    act(() => frame(2500))
+
+    expect(root.rotation).not.toEqual(initialRootRotation)
+    expect(glowGroup.rotation).toEqual(initialGlowRotation)
+    expect(glowGroup.position).toEqual(initialGlowPosition)
   })
 
   it('shares one configured procedural texture between the glow layers', async () => {
@@ -996,6 +1042,68 @@ describe('OrbitalAvatar', () => {
     expect(three.materials.length).toBeGreaterThan(0)
     expect(three.materials.every((material) => material.dispose.mock.calls.length === 1)).toBe(true)
     expect(onReady).not.toHaveBeenCalled()
+  })
+
+  it('disposes pending avatar and glow textures once when an unmounted request later succeeds', async () => {
+    installControlledBrowser()
+    three.textureResult = 'pending'
+    const onReady = vi.fn()
+    const onUnavailable = vi.fn()
+    const rendered = render(
+      <OrbitalAvatar onReady={onReady} onUnavailable={onUnavailable} />,
+    )
+
+    await waitFor(() => expect(three.dataTextures).toHaveLength(1))
+    await waitFor(() => expect(three.textureRequests).toHaveLength(1))
+    const avatarTexture = three.textures[0]
+    const glowTexture = three.dataTextures[0]
+    rendered.unmount()
+
+    expect(avatarTexture.dispose).toHaveBeenCalledTimes(1)
+    expect(glowTexture.dispose).toHaveBeenCalledTimes(1)
+    expect(rendered.container.querySelector('canvas')).toBeNull()
+    expect(onReady).not.toHaveBeenCalled()
+    expect(onUnavailable).not.toHaveBeenCalled()
+
+    await act(async () => three.textureRequests[0].onLoad(avatarTexture))
+
+    expect(avatarTexture.dispose).toHaveBeenCalledTimes(1)
+    expect(glowTexture.dispose).toHaveBeenCalledTimes(1)
+    expect(rendered.container.querySelector('canvas')).toBeNull()
+    expect(onReady).not.toHaveBeenCalled()
+    expect(onUnavailable).not.toHaveBeenCalled()
+  })
+
+  it('disposes pending avatar and glow textures once when an unmounted request later fails', async () => {
+    installControlledBrowser()
+    three.textureResult = 'pending'
+    const onReady = vi.fn()
+    const onUnavailable = vi.fn()
+    const rendered = render(
+      <OrbitalAvatar onReady={onReady} onUnavailable={onUnavailable} />,
+    )
+
+    await waitFor(() => expect(three.dataTextures).toHaveLength(1))
+    await waitFor(() => expect(three.textureRequests).toHaveLength(1))
+    const avatarTexture = three.textures[0]
+    const glowTexture = three.dataTextures[0]
+    rendered.unmount()
+
+    expect(avatarTexture.dispose).toHaveBeenCalledTimes(1)
+    expect(glowTexture.dispose).toHaveBeenCalledTimes(1)
+    expect(rendered.container.querySelector('canvas')).toBeNull()
+    expect(onReady).not.toHaveBeenCalled()
+    expect(onUnavailable).not.toHaveBeenCalled()
+
+    await act(async () =>
+      three.textureRequests[0].onError?.(new Error('texture failed')),
+    )
+
+    expect(avatarTexture.dispose).toHaveBeenCalledTimes(1)
+    expect(glowTexture.dispose).toHaveBeenCalledTimes(1)
+    expect(rendered.container.querySelector('canvas')).toBeNull()
+    expect(onReady).not.toHaveBeenCalled()
+    expect(onUnavailable).not.toHaveBeenCalled()
   })
 
   it('refreshes the visible animation loop without duplicate frames', async () => {
