@@ -138,6 +138,19 @@ describe('ServicesSection', () => {
     expect(
       decorations.map((decoration) => decoration?.dataset.orbitAccent),
     ).toEqual(['purple', 'blue', 'purple', 'purple', 'green', 'purple'])
+    expect(
+      articles.map((article, index) => [
+        within(article).getByRole('heading').textContent,
+        decorations[index]?.dataset.orbitVariant,
+      ]),
+    ).toEqual([
+      ['Software & Product Engineering', 'featured'],
+      ['Cybersecurity Tooling', 'sweep'],
+      ['Automation Systems', 'halo'],
+      ['Systems & Network Utilities', 'cross'],
+      ['Developer Experience', 'rise'],
+      ['Technical Direction', 'echo'],
+    ])
     decorations.forEach((decoration, index) => {
       expect(decoration?.parentElement).toBe(articles[index])
       expect(articles[index].firstElementChild).toBe(decoration)

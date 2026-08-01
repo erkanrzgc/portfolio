@@ -3,6 +3,7 @@ import {
   Compass,
   Network,
   ShieldCheck,
+  type LucideIcon,
   Wrench,
   Workflow,
 } from 'lucide-react'
@@ -20,44 +21,88 @@ interface ServiceDecoration {
   readonly delay: `${number}s`
 }
 
-const services = [
+interface Service {
+  readonly icon: LucideIcon
+  readonly name: string
+  readonly desc: string
+  readonly points: readonly string[]
+  readonly decoration: ServiceDecoration
+}
+
+const services: readonly Service[] = Object.freeze([
   {
     icon: Code2,
     name: 'Software & Product Engineering',
     desc: 'Building practical software, polished interfaces, and product-minded systems with clean architecture and maintainable code.',
     points: ['Product UI', 'React/TypeScript', 'Practical systems'],
+    decoration: {
+      variant: 'featured',
+      accent: 'purple',
+      node: ['78%', '24%'],
+      delay: '-1.2s',
+    },
   },
   {
     icon: ShieldCheck,
     name: 'Cybersecurity Tooling',
     desc: 'Creating practical security utilities for lab workflows, scanning, validation, reporting, and controlled testing environments.',
     points: ['Security scanners', 'Lab workflows', 'Actionable reports'],
+    decoration: {
+      variant: 'sweep',
+      accent: 'blue',
+      node: ['76%', '32%'],
+      delay: '-2.8s',
+    },
   },
   {
     icon: Workflow,
     name: 'Automation Systems',
     desc: 'Turning repetitive technical work into scripts, dashboards, CLI tools, and small systems that reduce manual effort.',
     points: ['CLI utilities', 'Workflow scripts', 'Data pipelines'],
+    decoration: {
+      variant: 'halo',
+      accent: 'purple',
+      node: ['70%', '76%'],
+      delay: '-4.1s',
+    },
   },
   {
     icon: Network,
     name: 'Systems & Network Utilities',
     desc: 'Building focused tools around operating systems, networking, terminal workflows, diagnostics, and everyday engineering friction.',
     points: ['Network tools', 'Terminal workflows', 'Windows/Linux'],
+    decoration: {
+      variant: 'cross',
+      accent: 'purple',
+      node: ['26%', '72%'],
+      delay: '-1.9s',
+    },
   },
   {
     icon: Wrench,
     name: 'Developer Experience',
     desc: 'Improving engineering work with clear tooling, useful defaults, documentation, integrations, and repeatable project structure.',
     points: ['Internal tools', 'Testing helpers', 'Documentation'],
+    decoration: {
+      variant: 'rise',
+      accent: 'green',
+      node: ['78%', '68%'],
+      delay: '-3.3s',
+    },
   },
   {
     icon: Compass,
     name: 'Technical Direction',
     desc: 'Helping shape ideas into scoped features, choose pragmatic implementation paths, and move from rough concept to polished user experience.',
     points: ['Architecture choices', 'Feature scoping', 'Product polish'],
+    decoration: {
+      variant: 'echo',
+      accent: 'purple',
+      node: ['30%', '25%'],
+      delay: '-4.7s',
+    },
   },
-]
+])
 
 const cardSpans = [
   'lg:col-span-4 lg:row-span-2',
@@ -67,45 +112,6 @@ const cardSpans = [
   'lg:col-span-2',
   'lg:col-span-2',
 ]
-
-const serviceDecorations: readonly ServiceDecoration[] = Object.freeze([
-  {
-    variant: 'featured',
-    accent: 'purple',
-    node: ['78%', '24%'],
-    delay: '-1.2s',
-  },
-  {
-    variant: 'sweep',
-    accent: 'blue',
-    node: ['76%', '32%'],
-    delay: '-2.8s',
-  },
-  {
-    variant: 'halo',
-    accent: 'purple',
-    node: ['70%', '76%'],
-    delay: '-4.1s',
-  },
-  {
-    variant: 'cross',
-    accent: 'purple',
-    node: ['26%', '72%'],
-    delay: '-1.9s',
-  },
-  {
-    variant: 'rise',
-    accent: 'green',
-    node: ['78%', '68%'],
-    delay: '-3.3s',
-  },
-  {
-    variant: 'echo',
-    accent: 'purple',
-    node: ['30%', '25%'],
-    delay: '-4.7s',
-  },
-])
 
 export default function ServicesSection() {
   return (
@@ -131,7 +137,7 @@ export default function ServicesSection() {
         className="mx-auto grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6 lg:auto-rows-[minmax(220px,auto)]"
       >
         {services.map((s, i) => {
-          const decoration = serviceDecorations[i]
+          const { decoration } = s
 
           return (
             <FadeIn
