@@ -798,8 +798,10 @@ describe('OrbitalAvatar', () => {
     await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
     const wrapper = rendered.container.firstElementChild as HTMLDivElement
     mockWrapperBounds(wrapper)
-    const capture = installPointerCapture(wrapper)
     const interactionRig = getGroup('interactionRig')
+    const capture = installPointerCapture(wrapper, {
+      dispatchLostSynchronously: true,
+    })
     runNextFrame(browser, 1000)
 
     act(() => {
@@ -825,6 +827,7 @@ describe('OrbitalAvatar', () => {
 
     expect(capture.setPointerCapture).toHaveBeenCalledWith(7)
     expect(capture.releasePointerCapture).toHaveBeenCalledWith(7)
+    expect(capture.releasePointerCapture).toHaveBeenCalledTimes(1)
     runNextFrame(browser, 1016)
     const releasedYaw = interactionRig.rotation.y
     runNextFrame(browser, 1032)
@@ -962,6 +965,7 @@ describe('OrbitalAvatar', () => {
     await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
     const wrapper = rendered.container.firstElementChild as HTMLDivElement
     mockWrapperBounds(wrapper)
+    const interactionRig = getGroup('interactionRig')
     const capture = installPointerCapture(wrapper, {
       dispatchLostSynchronously: true,
     })
@@ -1006,6 +1010,40 @@ describe('OrbitalAvatar', () => {
       handler({ matches: true } as unknown as MediaQueryListEvent)
     })
     expect(capture.releasePointerCapture).toHaveBeenCalledTimes(4)
+
+    const reducedMotionMedia = browser.media.get(
+      '(prefers-reduced-motion: reduce)',
+    )!
+    const reducedMotionHandler =
+      reducedMotionMedia.addEventListener.mock.calls.find(
+        ([type]) => type === 'change',
+      )?.[1] as EventListener
+    const activeMove = createPointerEvent('pointermove', {
+      clientX: 490,
+      clientY: 406,
+      pointerId: 24,
+      pointerType: 'touch',
+    })
+    act(() => {
+      wrapper.dispatchEvent(createPointerEvent('pointerdown', {
+        clientX: 400,
+        clientY: 400,
+        pointerId: 24,
+        pointerType: 'touch',
+      }))
+      wrapper.dispatchEvent(activeMove)
+      reducedMotionMedia.matches = true
+      reducedMotionHandler({ matches: true } as unknown as MediaQueryListEvent)
+    })
+
+    expect(activeMove.defaultPrevented).toBe(true)
+    expect(capture.releasePointerCapture).toHaveBeenCalledTimes(5)
+    expect(wrapper.style.pointerEvents).toBe('none')
+    expect(wrapper.style.touchAction).toBe('')
+    expect(wrapper.style.cursor).toBe('')
+    expect(browser.pendingFrames).toHaveLength(0)
+    expect(interactionRig.rotation.x).toBe(0.04)
+    expect(interactionRig.rotation.y).toBe(0)
   })
 
   it('cancels an uncaptured drag when the pointer leaves the surface', async () => {
@@ -1116,26 +1154,96 @@ describe('OrbitalAvatar', () => {
     await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
     const attached = addEventListener.mock.calls.filter(([type]) =>
       interactionTypes.includes(type),
-    )
+    ) as Array<[string, EventListener]>
     expect(attached.map(([type]) => type)).toEqual(interactionTypes)
     expect(
       windowAddEventListener.mock.calls.filter(([type]) => type === 'pointermove'),
     ).toHaveLength(0)
-
-    act(() => window.dispatchEvent(new Event('resize')))
-    act(() => window.dispatchEvent(new Event('resize')))
-    expect(
+    const originalCallbacks = attached.map(([, callback]) => callback)
+    const interactionAdds = () =>
       addEventListener.mock.calls.filter(([type]) =>
         interactionTypes.includes(type),
+      ) as Array<[string, EventListener]>
+    const interactionRemovals = () =>
+      removeEventListener.mock.calls.filter(([type]) =>
+        interactionTypes.includes(type),
+      ) as Array<[string, EventListener]>
+    const expectExactBatches = (
+      calls: Array<[string, EventListener]>,
+      batchCount: number,
+    ) => {
+      expect(calls).toHaveLength(interactionTypes.length * batchCount)
+      for (let batchIndex = 0; batchIndex < batchCount; batchIndex += 1) {
+        const batch = calls.slice(
+          batchIndex * interactionTypes.length,
+          (batchIndex + 1) * interactionTypes.length,
+        )
+        expect(batch.map(([type]) => type)).toEqual(interactionTypes)
+        expect(batch.map(([, callback]) => callback)).toEqual(originalCallbacks)
+      }
+    }
+
+    act(() => window.dispatchEvent(new Event('resize')))
+    act(() => window.dispatchEvent(new Event('resize')))
+    expectExactBatches(interactionAdds(), 1)
+    expectExactBatches(interactionRemovals(), 0)
+
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: true,
+    })
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    expectExactBatches(interactionAdds(), 1)
+    expectExactBatches(interactionRemovals(), 1)
+
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: false,
+    })
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    expectExactBatches(interactionAdds(), 2)
+    expectExactBatches(interactionRemovals(), 1)
+
+    act(() =>
+      browser.intersectionObservers[0].callback(
+        [{ isIntersecting: false } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
       ),
-    ).toHaveLength(interactionTypes.length)
+    )
+    expectExactBatches(interactionAdds(), 2)
+    expectExactBatches(interactionRemovals(), 2)
+    act(() =>
+      browser.intersectionObservers[0].callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    )
+    expectExactBatches(interactionAdds(), 3)
+    expectExactBatches(interactionRemovals(), 2)
+
+    const reducedMotionMedia = browser.media.get(
+      '(prefers-reduced-motion: reduce)',
+    )!
+    const reducedMotionHandler =
+      reducedMotionMedia.addEventListener.mock.calls.find(
+        ([type]) => type === 'change',
+      )?.[1] as EventListener
+    reducedMotionMedia.matches = true
+    act(() =>
+      reducedMotionHandler({ matches: true } as unknown as MediaQueryListEvent),
+    )
+    expectExactBatches(interactionAdds(), 3)
+    expectExactBatches(interactionRemovals(), 3)
+    reducedMotionMedia.matches = false
+    act(() =>
+      reducedMotionHandler({ matches: false } as unknown as MediaQueryListEvent),
+    )
+    expectExactBatches(interactionAdds(), 4)
+    expectExactBatches(interactionRemovals(), 3)
 
     rendered.unmount()
-    interactionTypes.forEach((type) => {
-      const callback = attached.find(([attachedType]) => attachedType === type)?.[1]
-      expect(removeEventListener).toHaveBeenCalledTimes(interactionTypes.length)
-      expect(removeEventListener).toHaveBeenCalledWith(type, callback)
-    })
+    expectExactBatches(interactionAdds(), 4)
+    expectExactBatches(interactionRemovals(), 4)
   })
 
   it('resumes animation without integrating time spent while paused', async () => {
