@@ -508,6 +508,17 @@ function installControlledBrowser({
   }
 }
 
+function runNextFrame(browser: ControlledBrowser, time: number) {
+  const nextFrame = browser.pendingFrames.entries().next().value as
+    | [number, FrameRequestCallback]
+    | undefined
+  if (!nextFrame) throw new Error('Expected a pending animation frame')
+
+  const [frameId, callback] = nextFrame
+  browser.pendingFrames.delete(frameId)
+  act(() => callback(time))
+}
+
 beforeEach(() => {
   three.failRender = false
   three.failRenderer = false
@@ -672,6 +683,78 @@ describe('OrbitalAvatar', () => {
     })
   })
 
+  it('layers pointer motion through the interaction rig with avatar and glow lag', async () => {
+    const browser = installControlledBrowser({ finePointer: true })
+    const rendered = render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    const wrapper = rendered.container.firstElementChild as HTMLDivElement
+    vi.spyOn(wrapper, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600,
+      height: 400,
+      left: 100,
+      right: 700,
+      top: 200,
+      width: 600,
+      x: 100,
+      y: 200,
+      toJSON: () => undefined,
+    })
+    const interactionRig = getGroup('interactionRig')
+    const avatarRig = getGroup('avatarRig')
+    const glowGroup = getGroup('glowGroup')
+    const orbitRig = getGroup('orbitRig-0')
+
+    runNextFrame(browser, 1000)
+    const initialGlowRotation = { ...glowGroup.rotation }
+    const initialOrbitRotation = { ...orbitRig.rotation }
+    act(() =>
+      window.dispatchEvent(
+        new MouseEvent('pointermove', { clientX: 700, clientY: 400 }),
+      ),
+    )
+    runNextFrame(browser, 1016)
+
+    expect(interactionRig.rotation.y).not.toBe(0)
+    expect(Math.abs(avatarRig.position.x)).toBeGreaterThan(0)
+    expect(Math.abs(avatarRig.position.x)).toBeLessThan(
+      Math.abs(interactionRig.rotation.y),
+    )
+    expect(orbitRig.rotation).not.toEqual(initialOrbitRotation)
+    expect(glowGroup.position.x).toBe(avatarRig.position.x)
+    expect(glowGroup.position.y).toBe(avatarRig.position.y)
+    expect(glowGroup.rotation).toEqual(initialGlowRotation)
+    expect(browser.pendingFrames).toHaveLength(1)
+  })
+
+  it('resumes animation without integrating time spent while paused', async () => {
+    const browser = installControlledBrowser()
+    render(<OrbitalAvatar />)
+
+    await waitFor(() => expect(browser.pendingFrames).toHaveLength(1))
+    runNextFrame(browser, 1000)
+    const satellitePosition = { ...three.meshes[2].position }
+
+    act(() =>
+      browser.intersectionObservers[0].callback(
+        [{ isIntersecting: false } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    )
+    act(() =>
+      browser.resizeObservers[0].callback([], {} as ResizeObserver),
+    )
+    act(() =>
+      browser.intersectionObservers[0].callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    )
+    runNextFrame(browser, 10000)
+
+    expect(three.meshes[2].position).toEqual(satellitePosition)
+  })
+
   it('reuses all orbit rigs while profiles change their visibility', async () => {
     installControlledBrowser()
     render(<OrbitalAvatar />)
@@ -739,31 +822,31 @@ describe('OrbitalAvatar', () => {
     })
   })
 
-  it('keeps glow sprites in a non-rotating scene group behind the avatar', async () => {
+  it('keeps glow sprites aligned with the avatar while the interaction rig rotates', async () => {
     const browser = installControlledBrowser()
     render(<OrbitalAvatar />)
 
     await waitFor(() => expect(three.sprites).toHaveLength(3))
     expect(three.groups).toHaveLength(16)
 
-    const root = getGroup('root')
+    const interactionRig = getGroup('interactionRig')
+    const avatarRig = getGroup('avatarRig')
     const glowGroup = getGroup('glowGroup')
     const initialGlowRotation = { ...glowGroup.rotation }
-    const initialGlowPosition = { ...glowGroup.position }
-    const initialRootRotation = { ...root.rotation }
+    const initialInteractionRotation = { ...interactionRig.rotation }
     expect(three.scenes[0].add).toHaveBeenCalledWith(glowGroup)
     GLOW_LAYERS.forEach((_definition, index) => {
       expect(glowGroup.add).toHaveBeenCalledWith(three.sprites[index])
-      expect(root.add).not.toHaveBeenCalledWith(three.sprites[index])
+      expect(interactionRig.add).not.toHaveBeenCalledWith(three.sprites[index])
     })
 
-    const [frameId, frame] = [...browser.pendingFrames.entries()][0]
-    browser.pendingFrames.delete(frameId)
-    act(() => frame(2500))
+    runNextFrame(browser, 1000)
+    runNextFrame(browser, 1040)
 
-    expect(root.rotation).not.toEqual(initialRootRotation)
+    expect(interactionRig.rotation).not.toEqual(initialInteractionRotation)
     expect(glowGroup.rotation).toEqual(initialGlowRotation)
-    expect(glowGroup.position).toEqual(initialGlowPosition)
+    expect(glowGroup.position.x).toBe(avatarRig.position.x)
+    expect(glowGroup.position.y).toBe(avatarRig.position.y)
   })
 
   it('shares one configured procedural texture between the glow layers', async () => {
@@ -843,12 +926,12 @@ describe('OrbitalAvatar', () => {
     await waitFor(() => expect(three.sprites).toHaveLength(3))
     three.sprites.slice(0, 2).forEach((sprite) => sprite.scale.set.mockClear())
 
-    const [frameId, frame] = [...browser.pendingFrames.entries()][0]
-    browser.pendingFrames.delete(frameId)
-    act(() => frame(2500))
+    runNextFrame(browser, 1000)
+    runNextFrame(browser, 1040)
 
     GLOW_LAYERS.forEach((definition, index) => {
-      const breath = 1 + Math.sin(2500 * 0.00045 + definition.pulseOffset) * 0.018
+      const breath =
+        1 + Math.sin(0.04 * 0.45 + definition.pulseOffset) * 0.018
       const [width, height, depth] =
         three.sprites[index].scale.set.mock.lastCall as [number, number, number]
       expect(width).toBeCloseTo(definition.scale[0] * breath, 12)
@@ -1211,6 +1294,13 @@ describe('OrbitalAvatar', () => {
     await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalledTimes(1))
     expect(rendered.container.querySelectorAll('canvas')).toHaveLength(1)
     expect(browser.requestAnimationFrame).not.toHaveBeenCalled()
+    const avatarRig = getGroup('avatarRig')
+    const glowGroup = getGroup('glowGroup')
+    expect(avatarRig.position.x).toBe(0)
+    expect(avatarRig.position.y).toBe(0)
+    expect(avatarRig.scale.setScalar).toHaveBeenLastCalledWith(1)
+    expect(glowGroup.position.x).toBe(0)
+    expect(glowGroup.position.y).toBe(0)
     expect(three.meshes[1].scale.setScalar).toHaveBeenLastCalledWith(1)
     GLOW_LAYERS.forEach((definition, index) => {
       expect(three.sprites[index].scale.set).toHaveBeenLastCalledWith(

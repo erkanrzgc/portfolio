@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react'
 
 import {
   createOrbitPoints,
-  createOrbitPosition,
   createParticlePositions,
   getOrbitDefinitions,
   getOrbitalSceneProfile,
+  writeOrbitPosition,
   type OrbitalSceneProfile,
 } from './orbitalAvatarGeometry'
 import {
@@ -13,7 +13,13 @@ import {
   GLOW_TEXTURE_SIZE,
   createRadialGlowTextureData,
 } from './orbitalGlow'
-import { getOrbitMotionResponse } from './orbitalAvatarMotion'
+import {
+  createOrbitalMotionState,
+  getOrbitMotionResponse,
+  stepOrbitalMotion,
+  writeOrbitRigRotation,
+  type OrbitalMotionState,
+} from './orbitalAvatarMotion'
 
 export interface OrbitalAvatarProps {
   className?: string
@@ -100,6 +106,17 @@ export default function OrbitalAvatar({
         let intersectsViewport = true
         let readySignalled = false
         let pointerListenerAttached = false
+        let motionState: OrbitalMotionState = createOrbitalMotionState()
+        let lastFrameTime: number | null = null
+        let dragDeltaX = 0
+        let dragDeltaY = 0
+        let dragging = false
+        let cancelMomentum = false
+        const pointer = { x: 0, y: 0 }
+        let avatarMaterial: import('three').SpriteMaterial | null = null
+        const resetFrameClock = () => {
+          lastFrameTime = null
+        }
 
         renderer = new THREE.WebGLRenderer({
           alpha: true,
@@ -109,6 +126,7 @@ export default function OrbitalAvatar({
         disposeScene = () => {
           if (disposed) return
           disposed = true
+          resetFrameClock()
           if (frameId !== null) {
             const scheduledFrame = frameId
             frameId = null
@@ -280,6 +298,7 @@ export default function OrbitalAvatar({
             position: orbitPosition,
             rig,
             scratchPosition: { x: 0, y: 0, z: 0 },
+            scratchRotation: { x: 0, y: 0, z: 0 },
           }
         })
 
@@ -310,8 +329,6 @@ export default function OrbitalAvatar({
         )
         particleField.renderOrder = 2
         interactionRig.add(particleField)
-
-        const pointer = { x: 0, y: 0 }
 
         const applySceneProfile = (
           nextProfile: OrbitalSceneProfile,
@@ -374,21 +391,69 @@ export default function OrbitalAvatar({
 
         const renderFrame = (time: number) => {
           if (disposed || !renderer) return
-          const animationTime = prefersReducedMotion ? 0 : time
+          const deltaMs =
+            prefersReducedMotion || lastFrameTime === null
+              ? 0
+              : Math.max(0, time - lastFrameTime)
+          lastFrameTime = prefersReducedMotion ? null : time
+          const canUsePointer =
+            !prefersReducedMotion &&
+            activeProfile.allowPointerParallax &&
+            finePointerQuery.matches &&
+            !coarsePointerQuery.matches
+          motionState = stepOrbitalMotion(motionState, {
+            cancelMomentum,
+            deltaMs,
+            dragDeltaX,
+            dragDeltaY,
+            dragging,
+            pointerX: canUsePointer ? pointer.x : 0,
+            pointerY: canUsePointer ? pointer.y : 0,
+          })
+          dragDeltaX = 0
+          dragDeltaY = 0
+          cancelMomentum = false
+          const animationSeconds = motionState.elapsedSeconds
 
-          orbitActors.forEach(({ mesh, orbit }, index) => {
+          orbitActors.forEach((actor, index) => {
             if (index >= activeProfile.orbitCount) return
-            const [x, y, z] = createOrbitPosition(
-              orbit,
-              orbit.phase + animationTime * orbit.speed * orbit.direction,
+            writeOrbitPosition(
+              actor.orbit,
+              actor.orbit.phase +
+                animationSeconds * 1000 *
+                  actor.orbit.speed *
+                  actor.orbit.direction,
+              actor.scratchPosition,
             )
-            mesh.position.set(x, y, z)
+            actor.mesh.position.set(
+              actor.scratchPosition.x,
+              actor.scratchPosition.y,
+              actor.scratchPosition.z,
+            )
+            writeOrbitRigRotation(
+              actor.motion,
+              animationSeconds,
+              motionState.pitchVelocity,
+              motionState.yawVelocity,
+              actor.scratchRotation,
+            )
+            actor.rig.rotation.x = actor.scratchRotation.x
+            actor.rig.rotation.y = actor.scratchRotation.y
+            actor.rig.rotation.z = actor.scratchRotation.z
           })
 
           atmosphere.scale.setScalar(1)
+          interactionRig.rotation.x = 0.04 + motionState.pitch
+          interactionRig.rotation.y = animationSeconds * 0.025 + motionState.yaw
+          avatarRig.position.x = motionState.avatarX
+          avatarRig.position.y = motionState.avatarY
+          avatarRig.scale.setScalar(motionState.avatarScale)
+          if (avatarMaterial) avatarMaterial.rotation = motionState.avatarRoll
+          glowGroup.position.x = motionState.avatarX
+          glowGroup.position.y = motionState.avatarY
           glowActors.forEach(({ definition, sprite }) => {
             const breath = 1 + Math.sin(
-              animationTime * 0.00045 + definition.pulseOffset,
+              animationSeconds * 0.45 + definition.pulseOffset,
             ) * 0.018
             sprite.scale.set(
               definition.scale[0] * activeProfile.glowScale * breath,
@@ -396,21 +461,8 @@ export default function OrbitalAvatar({
               1,
             )
           })
-          particleField.rotation.x = animationTime * 0.000006
-          particleField.rotation.y = animationTime * -0.000012
-
-          const canUsePointer =
-            !prefersReducedMotion &&
-            activeProfile.allowPointerParallax &&
-            finePointerQuery.matches &&
-            !coarsePointerQuery.matches
-          root.rotation.x = prefersReducedMotion
-            ? 0.04
-            : 0.04 + (canUsePointer ? pointer.y : 0) * 0.06
-          root.rotation.y = prefersReducedMotion
-            ? 0
-            : animationTime * 0.000025 +
-              (canUsePointer ? pointer.x : 0) * 0.08
+          particleField.rotation.x = animationSeconds * 0.006
+          particleField.rotation.y = animationSeconds * -0.012
           renderer.render(scene, camera)
         }
 
@@ -428,7 +480,10 @@ export default function OrbitalAvatar({
           camera.aspect = width / height
           camera.updateProjectionMatrix()
           renderer.setSize(width, height, false)
-          if (sceneReady && (prefersReducedMotion || frameId === null)) {
+          if (
+            sceneReady &&
+            (prefersReducedMotion || (frameId === null && shouldAnimate()))
+          ) {
             renderFrame(performance.now())
           }
         }
@@ -447,6 +502,7 @@ export default function OrbitalAvatar({
             return
           }
 
+          resetFrameClock()
           if (frameId !== null) {
             cancelAnimationFrame(frameId)
             frameId = null
@@ -562,7 +618,7 @@ export default function OrbitalAvatar({
         if (cancelled || disposed) return
         loadedTexture.colorSpace = THREE.SRGBColorSpace
 
-        const avatarMaterial = new THREE.SpriteMaterial({
+        avatarMaterial = new THREE.SpriteMaterial({
           alphaTest: 0.02,
           depthTest: true,
           depthWrite: true,
