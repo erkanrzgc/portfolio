@@ -11,6 +11,14 @@ function findCssStyleRule(selector: string): CSSStyleRule | undefined {
     )
 }
 
+function normalizeCssWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function styleValue(rule: CSSStyleRule | undefined, property: string): string {
+  return normalizeCssWhitespace(rule?.style.getPropertyValue(property) ?? '')
+}
+
 describe('global scroll container styles', () => {
   it('positions the document root for target-based scroll measurements', () => {
     const positionedValues = ['relative', 'absolute', 'fixed', 'sticky']
@@ -60,16 +68,23 @@ describe('global scroll container styles', () => {
     expect(afterRule).toBeDefined()
     expect(sharedRule).toBeDefined()
 
-    const beforeBorder = beforeRule?.style.getPropertyValue('border').trim()
-    expect(['', '0', '0px', 'none']).toContain(beforeBorder)
-    expect(beforeRule?.style.getPropertyValue('box-shadow').trim()).toBe('none')
+    expect(styleValue(beforeRule, 'border')).toBe('0px')
+    expect(styleValue(beforeRule, 'box-shadow')).toBe('none')
+    expect(styleValue(beforeRule, 'background')).toBe(
+      'radial-gradient(at 50% 52%, rgba(168, 85, 247, 0.28) 0%, rgba(126, 34, 206, 0.14) 34%, rgba(76, 29, 149, 0.06) 52%, rgba(76, 29, 149, 0) 74%)',
+    )
+    expect(styleValue(beforeRule, 'filter')).toBe('blur(18px)')
+    expect(styleValue(beforeRule, 'inset')).toBe('10% 4%')
+    expect(styleValue(beforeRule, 'opacity')).toBe('0.86')
+    expect(styleValue(beforeRule, 'transform')).toBe('scale(1.08, 0.92)')
 
-    for (const rule of [beforeRule, afterRule]) {
-      const background = rule?.style.getPropertyValue('background').trim() ?? ''
-      expect(background).toContain('radial-gradient')
-      expect(background).toMatch(/^radial-gradient\(/)
-      expect(rule?.style.getPropertyValue('filter')).toContain('blur')
-    }
+    expect(styleValue(afterRule, 'background')).toBe(
+      'radial-gradient(rgba(147, 51, 234, 0.16) 0%, rgba(109, 40, 217, 0.08) 38%, rgba(88, 28, 135, 0) 72%)',
+    )
+    expect(styleValue(afterRule, 'filter')).toBe('blur(34px)')
+    expect(styleValue(afterRule, 'inset')).toBe('4% -4%')
+    expect(styleValue(afterRule, 'opacity')).toBe('0.68')
+    expect(styleValue(afterRule, 'transform')).toBe('scale(1.18, 0.94)')
 
     expect(['""', "''"]).toContain(
       sharedRule?.style.getPropertyValue('content'),
