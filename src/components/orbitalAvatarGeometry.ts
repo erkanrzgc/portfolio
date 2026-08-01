@@ -6,6 +6,13 @@ export interface OrbitDefinition {
   readonly phase: number
   readonly direction: 1 | -1
   readonly color: number
+  readonly visualWeight: number
+}
+
+export interface MutableOrbitPosition {
+  x: number
+  y: number
+  z: number
 }
 
 export interface OrbitalSceneProfile {
@@ -30,7 +37,7 @@ const DESKTOP_PROFILE: OrbitalSceneProfile = Object.freeze({
   allowPointerParallax: true,
   glowIntensity: 1,
   glowScale: 1,
-  orbitCount: 8,
+  orbitCount: 11,
   orbitScale: 1,
   orbitSegments: 96,
   particleCount: 96,
@@ -42,7 +49,7 @@ const TABLET_PROFILE: OrbitalSceneProfile = Object.freeze({
   allowPointerParallax: true,
   glowIntensity: 0.84,
   glowScale: 0.92,
-  orbitCount: 8,
+  orbitCount: 9,
   orbitScale: 0.88,
   orbitSegments: 72,
   particleCount: 56,
@@ -54,26 +61,29 @@ const MOBILE_PROFILE: OrbitalSceneProfile = Object.freeze({
   allowPointerParallax: false,
   glowIntensity: 0.7,
   glowScale: 0.84,
-  orbitCount: 5,
+  orbitCount: 6,
   orbitScale: 0.76,
   orbitSegments: 56,
   particleCount: 28,
   pixelRatioCap: 1.15,
 })
 
-const ORBITS: readonly OrbitDefinition[] = [
-  { radiusX: 1.95, radiusY: 0.56, rotation: [1.12, 0.08, 0.02], speed: 0.00018, phase: 0.1, direction: 1, color: 0xd8b4fe },
-  { radiusX: 1.82, radiusY: 0.68, rotation: [0.94, 0.51, 0.62], speed: 0.00023, phase: 0.7, direction: -1, color: 0xc084fc },
-  { radiusX: 1.7, radiusY: 0.82, rotation: [1.25, -0.44, 1.18], speed: 0.00015, phase: 1.4, direction: 1, color: 0x86efac },
-  { radiusX: 1.58, radiusY: 1.04, rotation: [0.82, 0.65, 1.72], speed: 0.00027, phase: 2.1, direction: -1, color: 0xe9d5ff },
-  { radiusX: 2.06, radiusY: 0.48, rotation: [1.34, -0.21, 2.25], speed: 0.00012, phase: 2.8, direction: 1, color: 0xa78bfa },
-  { radiusX: 1.5, radiusY: 1.18, rotation: [1.03, -0.76, 2.82], speed: 0.00021, phase: 3.5, direction: -1, color: 0x7dd3fc },
-  { radiusX: 1.88, radiusY: 0.61, rotation: [0.73, 0.39, 3.34], speed: 0.00016, phase: 4.2, direction: 1, color: 0x86efac },
-  { radiusX: 1.66, radiusY: 0.9, rotation: [1.41, -0.57, 3.91], speed: 0.00025, phase: 5, direction: -1, color: 0xd8b4fe },
-]
+const ORBITS: readonly OrbitDefinition[] = Object.freeze([
+  { radiusX: 1.95, radiusY: 0.56, rotation: [1.12, 0.08, 0.02], speed: 0.00018, phase: 0.1, direction: 1, color: 0xd8b4fe, visualWeight: 1 },
+  { radiusX: 1.82, radiusY: 0.68, rotation: [0.94, 0.51, 0.62], speed: 0.00023, phase: 0.7, direction: -1, color: 0xc084fc, visualWeight: 1 },
+  { radiusX: 1.7, radiusY: 0.82, rotation: [1.25, -0.44, 1.18], speed: 0.00015, phase: 1.4, direction: 1, color: 0x86efac, visualWeight: 1 },
+  { radiusX: 1.58, radiusY: 1.04, rotation: [0.82, 0.65, 1.72], speed: 0.00027, phase: 2.1, direction: -1, color: 0xe9d5ff, visualWeight: 1 },
+  { radiusX: 2.06, radiusY: 0.48, rotation: [1.34, -0.21, 2.25], speed: 0.00012, phase: 2.8, direction: 1, color: 0xa78bfa, visualWeight: 1 },
+  { radiusX: 1.5, radiusY: 1.18, rotation: [1.03, -0.76, 2.82], speed: 0.00021, phase: 3.5, direction: -1, color: 0x7dd3fc, visualWeight: 1 },
+  { radiusX: 1.88, radiusY: 0.61, rotation: [0.73, 0.39, 3.34], speed: 0.00016, phase: 4.2, direction: 1, color: 0x86efac, visualWeight: 1 },
+  { radiusX: 1.66, radiusY: 0.9, rotation: [1.41, -0.57, 3.91], speed: 0.00025, phase: 5, direction: -1, color: 0xd8b4fe, visualWeight: 1 },
+  { radiusX: 2.14, radiusY: 0.72, rotation: [1.18, 0.72, 4.42], speed: 0.00014, phase: 5.6, direction: 1, color: 0xc4b5fd, visualWeight: 0.84 },
+  { radiusX: 1.74, radiusY: 1.12, rotation: [0.66, -0.58, 5.08], speed: 0.00019, phase: 0.45, direction: -1, color: 0xb794f4, visualWeight: 0.78 },
+  { radiusX: 2.2, radiusY: 0.42, rotation: [1.46, 0.27, 5.61], speed: 0.00011, phase: 1.9, direction: 1, color: 0xe9d5ff, visualWeight: 0.72 },
+])
 
-export function getOrbitDefinitions(isMobile: boolean): readonly OrbitDefinition[] {
-  return ORBITS.slice(0, isMobile ? 5 : 8)
+export function getOrbitDefinitions(): readonly OrbitDefinition[] {
+  return ORBITS
 }
 
 export function getOrbitalSceneProfile({
@@ -114,10 +124,33 @@ export function createOrbitPosition(
   orbit: OrbitDefinition,
   angle: number,
 ): readonly [number, number, number] {
-  return rotatePoint(
-    [orbit.radiusX * Math.cos(angle), orbit.radiusY * Math.sin(angle), 0],
-    orbit.rotation,
-  )
+  const target: MutableOrbitPosition = { x: 0, y: 0, z: 0 }
+  writeOrbitPosition(orbit, angle, target)
+  return [target.x, target.y, target.z]
+}
+
+export function writeOrbitPosition(
+  orbit: OrbitDefinition,
+  angle: number,
+  target: MutableOrbitPosition,
+): MutableOrbitPosition {
+  const x = orbit.radiusX * Math.cos(angle)
+  const y = orbit.radiusY * Math.sin(angle)
+  const [xRotation, yRotation, zRotation] = orbit.rotation
+  const xCos = Math.cos(xRotation)
+  const xSin = Math.sin(xRotation)
+  const yAfterX = y * xCos
+  const zAfterX = y * xSin
+  const yCos = Math.cos(yRotation)
+  const ySin = Math.sin(yRotation)
+  const xAfterY = x * yCos + zAfterX * ySin
+  const zAfterY = -x * ySin + zAfterX * yCos
+  const zCos = Math.cos(zRotation)
+  const zSin = Math.sin(zRotation)
+  target.x = xAfterY * zCos - yAfterX * zSin
+  target.y = xAfterY * zSin + yAfterX * zCos
+  target.z = zAfterY
+  return target
 }
 
 export function createOrbitPoints(
@@ -125,41 +158,15 @@ export function createOrbitPoints(
   segments: number,
 ): Float32Array {
   const points = new Float32Array((segments + 1) * 3)
+  const target: MutableOrbitPosition = { x: 0, y: 0, z: 0 }
 
   for (let index = 0; index <= segments; index += 1) {
     const angle = index === segments ? 0 : (index / segments) * Math.PI * 2
-    const [x, y, z] = createOrbitPosition(orbit, angle)
-    points[index * 3] = x
-    points[index * 3 + 1] = y
-    points[index * 3 + 2] = z
+    writeOrbitPosition(orbit, angle, target)
+    points[index * 3] = target.x
+    points[index * 3 + 1] = target.y
+    points[index * 3 + 2] = target.z
   }
 
   return points
-}
-
-function rotatePoint(
-  point: readonly [number, number, number],
-  rotation: readonly [number, number, number],
-): readonly [number, number, number] {
-  const [xRotation, yRotation, zRotation] = rotation
-  const [x, y, z] = point
-
-  const xCos = Math.cos(xRotation)
-  const xSin = Math.sin(xRotation)
-  const yAfterX = y * xCos - z * xSin
-  const zAfterX = y * xSin + z * xCos
-
-  const yCos = Math.cos(yRotation)
-  const ySin = Math.sin(yRotation)
-  const xAfterY = x * yCos + zAfterX * ySin
-  const zAfterY = -x * ySin + zAfterX * yCos
-
-  const zCos = Math.cos(zRotation)
-  const zSin = Math.sin(zRotation)
-
-  return [
-    xAfterY * zCos - yAfterX * zSin,
-    xAfterY * zSin + yAfterX * zCos,
-    zAfterY,
-  ]
 }

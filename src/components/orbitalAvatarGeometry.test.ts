@@ -5,13 +5,44 @@ import {
   createOrbitPoints,
   getOrbitDefinitions,
   getOrbitalSceneProfile,
+  writeOrbitPosition,
   type OrbitDefinition,
 } from './orbitalAvatarGeometry'
 
 describe('orbital avatar geometry', () => {
-  it('uses eight desktop orbits and five mobile orbits', () => {
-    expect(getOrbitDefinitions(false)).toHaveLength(8)
-    expect(getOrbitDefinitions(true)).toHaveLength(5)
+  it('orders eleven desktop orbits for six mobile and nine tablet priorities', () => {
+    const orbits = getOrbitDefinitions()
+    expect(orbits).toHaveLength(11)
+    expect(getOrbitalSceneProfile({ coarsePointer: false, width: 1440 }).orbitCount).toBe(11)
+    expect(getOrbitalSceneProfile({ coarsePointer: false, width: 900 }).orbitCount).toBe(9)
+    expect(getOrbitalSceneProfile({ coarsePointer: false, width: 390 }).orbitCount).toBe(6)
+    expect(getOrbitalSceneProfile({ coarsePointer: true, width: 1440 }).orbitCount).toBe(6)
+  })
+
+  it('keeps added desktop density quieter than the core orbit set', () => {
+    const orbits = getOrbitDefinitions()
+    expect(orbits.slice(0, 8).every((orbit) => orbit.visualWeight === 1)).toBe(true)
+    expect(orbits.slice(8).map((orbit) => orbit.visualWeight)).toEqual([0.84, 0.78, 0.72])
+    expect(orbits.filter((orbit) => orbit.color === 0x86efac)).toHaveLength(2)
+  })
+
+  it('writes an orbit position into a reusable target', () => {
+    const target = { x: 99, y: 99, z: 99 }
+    const orbit = getOrbitDefinitions()[8]
+    const returned = writeOrbitPosition(orbit, Math.PI / 3, target)
+    const allocated = createOrbitPosition(orbit, Math.PI / 3)
+    expect(returned).toBe(target)
+    expect([target.x, target.y, target.z]).toEqual(allocated)
+  })
+
+  it('keeps every added orbit closed with front and back depth', () => {
+    getOrbitDefinitions().slice(8).forEach((orbit) => {
+      const points = createOrbitPoints(orbit, 96)
+      const zValues = Array.from({ length: 97 }, (_, index) => points[index * 3 + 2])
+      expect(Array.from(points.slice(0, 3))).toEqual(Array.from(points.slice(-3)))
+      expect(Math.max(...zValues)).toBeGreaterThan(0)
+      expect(Math.min(...zValues)).toBeLessThan(0)
+    })
   })
 
   it('selects progressively lighter responsive scene profiles', () => {
@@ -32,7 +63,7 @@ describe('orbital avatar geometry', () => {
       allowPointerParallax: true,
       glowIntensity: 1,
       glowScale: 1,
-      orbitCount: 8,
+      orbitCount: 11,
       orbitScale: 1,
       tier: 'desktop',
     })
@@ -40,14 +71,14 @@ describe('orbital avatar geometry', () => {
       allowPointerParallax: true,
       glowIntensity: 0.84,
       glowScale: 0.92,
-      orbitCount: 8,
+      orbitCount: 9,
       tier: 'tablet',
     })
     expect(mobile).toMatchObject({
       allowPointerParallax: false,
       glowIntensity: 0.7,
       glowScale: 0.84,
-      orbitCount: 5,
+      orbitCount: 6,
       tier: 'mobile',
     })
     expect(tablet.orbitScale).toBeLessThan(desktop.orbitScale)
@@ -97,7 +128,7 @@ describe('orbital avatar geometry', () => {
   })
 
   it('creates deterministic closed ellipses with front and back depth', () => {
-    const orbit = getOrbitDefinitions(false)[1]
+    const orbit = getOrbitDefinitions()[1]
     const first = createOrbitPoints(orbit, 64)
     const second = createOrbitPoints(orbit, 64)
     const depth = Array.from(first).filter((_, index) => index % 3 === 2)
@@ -118,6 +149,7 @@ describe('orbital avatar geometry', () => {
       phase: 0,
       direction: 1,
       color: 0,
+      visualWeight: 1,
     }
     const angleOnPositiveY = Math.PI / 2
     const withRotation = (
