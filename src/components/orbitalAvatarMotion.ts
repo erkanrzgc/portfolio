@@ -209,6 +209,12 @@ export interface OrbitRigRotation {
   readonly z: number
 }
 
+export interface MutableOrbitRigRotation {
+  x: number
+  y: number
+  z: number
+}
+
 const DRAG_DEAD_ZONE = 8
 const MAX_SECONDARY_ROTATION = Math.PI / 36
 
@@ -238,6 +244,22 @@ export function getOrbitRigRotation(
   pitchVelocity: number,
   yawVelocity: number,
 ): OrbitRigRotation {
+  return Object.freeze(writeOrbitRigRotation(
+    response,
+    elapsedSeconds,
+    pitchVelocity,
+    yawVelocity,
+    { x: 0, y: 0, z: 0 },
+  ))
+}
+
+export function writeOrbitRigRotation(
+  response: OrbitMotionResponse,
+  elapsedSeconds: number,
+  pitchVelocity: number,
+  yawVelocity: number,
+  target: MutableOrbitRigRotation,
+): MutableOrbitRigRotation {
   const elapsed = Math.max(0, finiteOrZero(elapsedSeconds))
   const phase = response.phase + elapsed * response.precessionRate * response.direction
   const x = Math.sin(phase) * response.precessionAmplitude
@@ -245,9 +267,8 @@ export function getOrbitRigRotation(
   const y = Math.cos(phase * 0.73) * response.precessionAmplitude * response.lag
     + finiteOrZero(pitchVelocity) * response.velocityInfluence
   const z = Math.sin(phase * 0.47) * response.precessionAmplitude * 0.5
-  return Object.freeze({
-    x: clamp(x, -MAX_SECONDARY_ROTATION, MAX_SECONDARY_ROTATION),
-    y: clamp(y, -MAX_SECONDARY_ROTATION, MAX_SECONDARY_ROTATION),
-    z: clamp(z, -MAX_SECONDARY_ROTATION, MAX_SECONDARY_ROTATION),
-  })
+  target.x = clamp(x, -MAX_SECONDARY_ROTATION, MAX_SECONDARY_ROTATION)
+  target.y = clamp(y, -MAX_SECONDARY_ROTATION, MAX_SECONDARY_ROTATION)
+  target.z = clamp(z, -MAX_SECONDARY_ROTATION, MAX_SECONDARY_ROTATION)
+  return target
 }

@@ -7,6 +7,7 @@ import {
   getOrbitRigRotation,
   resolveOrbitalDragIntent,
   stepOrbitalMotion,
+  writeOrbitRigRotation,
 } from './orbitalAvatarMotion'
 
 describe('orbital avatar motion', () => {
@@ -217,9 +218,25 @@ describe('orbital avatar motion', () => {
     const first = getOrbitRigRotation(response, 0, 0, 0)
     const later = getOrbitRigRotation(response, 8, 0.4, -0.3)
     const limit = Math.PI / 36
+    const positive = getOrbitRigRotation(response, 8, 1_000, 1_000)
+    const negative = getOrbitRigRotation(response, 8, -1_000, -1_000)
     expect(later).not.toEqual(first)
     expect(Math.abs(later.x)).toBeLessThanOrEqual(limit)
     expect(Math.abs(later.y)).toBeLessThanOrEqual(limit)
     expect(Math.abs(later.z)).toBeLessThanOrEqual(limit)
+    expect(positive.x).toBe(limit)
+    expect(positive.y).toBe(limit)
+    expect(negative.x).toBe(-limit)
+    expect(negative.y).toBe(-limit)
+  })
+
+  it('writes orbit rotation into the supplied target without allocating', () => {
+    const response = getOrbitMotionResponse(getOrbitDefinitions()[7], 7)
+    const expected = getOrbitRigRotation(response, 4.5, -0.25, 0.35)
+    const target = { x: Number.NaN, y: Number.NaN, z: Number.NaN }
+    const result = writeOrbitRigRotation(response, 4.5, -0.25, 0.35, target)
+
+    expect(result).toBe(target)
+    expect(result).toEqual(expected)
   })
 })
