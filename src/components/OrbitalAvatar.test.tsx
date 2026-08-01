@@ -1,6 +1,12 @@
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  GLOW_LAYERS,
+  GLOW_TEXTURE_SIZE,
+  createRadialGlowTextureData,
+} from './orbitalGlow'
+
 const three = vi.hoisted(() => {
   const state = {
     failRender: false,
@@ -24,6 +30,7 @@ const three = vi.hoisted(() => {
       data: Uint8Array
       width: number
       height: number
+      format: unknown
       dispose: ReturnType<typeof vi.fn>
       needsUpdate: boolean
       magFilter?: unknown
@@ -503,12 +510,19 @@ describe('OrbitalAvatar', () => {
 
     await waitFor(() => expect(three.sprites).toHaveLength(3))
 
-    const [innerGlow, outerGlow, avatar] = three.sprites
-    expect(innerGlow.renderOrder).toBe(0)
-    expect(outerGlow.renderOrder).toBe(0)
+    const [avatar] = three.sprites.slice(2)
     expect(avatar.renderOrder).toBe(1)
-    expect(innerGlow.position.set).toHaveBeenCalledWith(0, 0, -0.42)
-    expect(outerGlow.position.set).toHaveBeenCalledWith(0, 0, -0.58)
+    GLOW_LAYERS.forEach((definition, index) => {
+      const glow = three.sprites[index]
+      expect(glow.renderOrder).toBe(0)
+      expect(glow.position.set).toHaveBeenCalledWith(0, 0, definition.z)
+      expect(definition.z).toBeLessThan(0)
+      expect(glow.scale.set).toHaveBeenCalledWith(
+        definition.scale[0],
+        definition.scale[1],
+        1,
+      )
+    })
   })
 
   it('shares one configured procedural texture between the glow layers', async () => {
@@ -520,23 +534,27 @@ describe('OrbitalAvatar', () => {
     expect(three.dataTextures).toHaveLength(1)
     const glowTexture = three.dataTextures[0]
     expect(glowTexture).toMatchObject({
+      format: 'rgba',
       generateMipmaps: false,
       magFilter: 'linear',
       minFilter: 'linear',
       needsUpdate: true,
+      width: GLOW_TEXTURE_SIZE,
+      height: GLOW_TEXTURE_SIZE,
     })
-    expect(glowTexture.data).toBeInstanceOf(Uint8Array)
-    expect(three.sprites[0].material.options).toMatchObject({
-      blending: 2,
-      depthWrite: false,
-      map: glowTexture,
-      transparent: true,
-    })
-    expect(three.sprites[1].material.options).toMatchObject({
-      blending: 2,
-      depthWrite: false,
-      map: glowTexture,
-      transparent: true,
+    expect(glowTexture.data).toEqual(createRadialGlowTextureData())
+    GLOW_LAYERS.forEach((definition, index) => {
+      const glow = three.sprites[index]
+      expect(glow.material.opacity).toBe(definition.opacity)
+      expect(glow.material.options).toMatchObject({
+        blending: 2,
+        color: definition.color,
+        depthTest: true,
+        depthWrite: false,
+        map: glowTexture,
+        opacity: definition.opacity,
+        transparent: true,
+      })
     })
   })
 
@@ -546,8 +564,8 @@ describe('OrbitalAvatar', () => {
 
     await waitFor(() => expect(three.renderers[0]?.render).toHaveBeenCalled())
 
-    expect(three.materials[0].opacity).toBeLessThanOrEqual(0.005)
-    expect(three.materials[1].opacity).toBeLessThanOrEqual(0.005)
+    expect(three.materials[0].opacity).toBe(0.003)
+    expect(three.materials[1].opacity).toBe(0.004)
   })
 
   it('renders a subtle deterministic particle field around the avatar', async () => {
@@ -582,17 +600,21 @@ describe('OrbitalAvatar', () => {
     render(<OrbitalAvatar />)
 
     await waitFor(() => expect(three.sprites).toHaveLength(3))
-    three.sprites[0].scale.set.mockClear()
+    three.sprites.slice(0, 2).forEach((sprite) => sprite.scale.set.mockClear())
 
     const [frameId, frame] = [...browser.pendingFrames.entries()][0]
     browser.pendingFrames.delete(frameId)
     act(() => frame(2500))
 
-    const [width, height, depth] =
-      three.sprites[0].scale.set.mock.lastCall as [number, number, number]
-    expect(width).not.toBeCloseTo(2.85, 4)
-    expect(height).not.toBeCloseTo(2.38, 4)
-    expect(depth).toBe(1)
+    GLOW_LAYERS.forEach((definition, index) => {
+      const breath = 1 + Math.sin(2500 * 0.00045 + definition.pulseOffset) * 0.018
+      const [width, height, depth] =
+        three.sprites[index].scale.set.mock.lastCall as [number, number, number]
+      expect(width).toBeCloseTo(definition.scale[0] * breath, 12)
+      expect(height).toBeCloseTo(definition.scale[1] * breath, 12)
+      expect(depth).toBe(1)
+      expect(Math.abs(breath - 1)).toBeLessThanOrEqual(0.018)
+    })
   })
 
   it('keeps renderer and core quality independent from the initial viewport', async () => {
@@ -644,7 +666,11 @@ describe('OrbitalAvatar', () => {
     const desktopGlowSprites = [...three.sprites.slice(0, 2)]
     const desktopGlowTexture = three.dataTextures[0]
     expect(desktopGlowSprites).toHaveLength(2)
-    expect(desktopGlowSprites[0].material.opacity).toBe(0.2)
+    GLOW_LAYERS.forEach((definition, index) => {
+      expect(desktopGlowSprites[index].material.opacity).toBe(
+        definition.opacity,
+      )
+    })
 
     Object.defineProperty(window, 'innerWidth', {
       configurable: true,
@@ -669,14 +695,19 @@ describe('OrbitalAvatar', () => {
     ).toHaveLength(96 * 3)
     expect(three.points[0].geometry.setDrawRange).toHaveBeenLastCalledWith(0, 28)
     expect(three.renderers[0].setPixelRatio).toHaveBeenLastCalledWith(1.15)
-    expect(three.sprites.slice(0, 2)).toEqual(desktopGlowSprites)
+    expect(three.sprites).toHaveLength(3)
     expect(three.dataTextures[0]).toBe(desktopGlowTexture)
-    expect(three.sprites[0].scale.set).toHaveBeenLastCalledWith(
-      2.85 * 0.84,
-      2.38 * 0.84,
-      1,
-    )
-    expect(three.sprites[0].material.opacity).toBeCloseTo(0.2 * 0.7)
+    expect(three.dataTextures).toHaveLength(1)
+    GLOW_LAYERS.forEach((definition, index) => {
+      const glow = three.sprites[index]
+      expect(glow).toBe(desktopGlowSprites[index])
+      expect(glow.scale.set).toHaveBeenLastCalledWith(
+        definition.scale[0] * 0.84,
+        definition.scale[1] * 0.84,
+        1,
+      )
+      expect(glow.material.opacity).toBeCloseTo(definition.opacity * 0.7)
+    })
     expect(windowRemoveEventListener).toHaveBeenCalledWith(
       'pointermove',
       expect.any(Function),
@@ -915,7 +946,13 @@ describe('OrbitalAvatar', () => {
     expect(rendered.container.querySelectorAll('canvas')).toHaveLength(1)
     expect(browser.requestAnimationFrame).not.toHaveBeenCalled()
     expect(three.meshes[1].scale.setScalar).toHaveBeenLastCalledWith(1)
-    expect(three.sprites[0].scale.set).toHaveBeenLastCalledWith(2.85, 2.38, 1)
+    GLOW_LAYERS.forEach((definition, index) => {
+      expect(three.sprites[index].scale.set).toHaveBeenLastCalledWith(
+        definition.scale[0],
+        definition.scale[1],
+        1,
+      )
+    })
   })
 
   it('redraws the stable reduced-motion frame after resize', async () => {
@@ -934,7 +971,13 @@ describe('OrbitalAvatar', () => {
     expect(
       three.meshes[1].scale.setScalar.mock.calls.every(([scale]) => scale === 1),
     ).toBe(true)
-    expect(three.sprites[0].scale.set).toHaveBeenLastCalledWith(2.85, 2.38, 1)
+    GLOW_LAYERS.forEach((definition, index) => {
+      expect(three.sprites[index].scale.set).toHaveBeenLastCalledWith(
+        definition.scale[0],
+        definition.scale[1],
+        1,
+      )
+    })
   })
 
   it('disposes the renderer and resources without mounting a canvas when texture loading fails', async () => {
