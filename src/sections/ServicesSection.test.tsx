@@ -106,4 +106,20 @@ describe('ServicesSection', () => {
       expect(article).not.toHaveAttribute('role', 'button')
     })
   })
+
+  it('hides decorative service icons from the accessibility tree', () => {
+    render(<ServicesSection />)
+
+    const serviceList = screen.getByRole('list', {
+      name: 'Services I provide',
+    })
+    const icons = within(serviceList)
+      .getAllByRole('article')
+      .map((article) => article.querySelector('svg'))
+
+    expect(icons).toHaveLength(6)
+    icons.forEach((icon) => {
+      expect(icon).toHaveAttribute('aria-hidden', 'true')
+    })
+  })
 })

@@ -10,13 +10,15 @@ vi.mock('../components/FadeIn', () => ({
 
 vi.mock('../components/OrbitalAvatar', () => ({
   default: ({
+    className,
     onReady,
     onUnavailable,
   }: {
+    className?: string
     onReady?: () => void
     onUnavailable?: () => void
   }) => (
-    <>
+    <div className={className} data-testid="orbital-avatar">
       <button data-testid="orbital-ready" onClick={onReady} type="button">
         Orbital avatar ready
       </button>
@@ -27,7 +29,7 @@ vi.mock('../components/OrbitalAvatar', () => ({
       >
         Orbital avatar unavailable
       </button>
-    </>
+    </div>
   ),
 }))
 
@@ -86,5 +88,13 @@ describe('HeroSection', () => {
     expect(
       screen.getByText('Software Engineer & Cybersecurity Enthusiast'),
     ).toBeInTheDocument()
+  })
+
+  it('marks the orbital canvas host for reduced-motion transition overrides', () => {
+    render(<HeroSection />)
+
+    expect(screen.getByTestId('orbital-avatar')).toHaveClass(
+      'hero-orbital-avatar',
+    )
   })
 })

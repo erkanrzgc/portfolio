@@ -54,7 +54,7 @@ export default function HeroSection() {
       {/* Hero Portrait */}
       <div className="absolute left-1/2 top-[62%] z-10 h-[min(92vw,780px)] w-[min(96vw,980px)] -translate-x-1/2 -translate-y-1/2 sm:top-[64%]">
         <OrbitalAvatar
-          className="absolute inset-0 z-10"
+          className="hero-orbital-avatar absolute inset-0 z-10"
           onReady={() => setOrbitalReady(true)}
           onUnavailable={() => setOrbitalReady(false)}
         />

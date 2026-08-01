@@ -146,6 +146,11 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hero-orbital-avatar > canvas,
+  [data-avatar-fallback] {
+    transition: none !important;
+  }
+
   .hero-avatar-fallback-motion {
     animation: none;
   }

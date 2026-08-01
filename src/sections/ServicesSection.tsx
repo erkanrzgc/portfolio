@@ -103,7 +103,11 @@ export default function ServicesSection() {
                       i === 0 ? 'h-20 w-20' : 'h-14 w-14'
                     }`}
                   >
-                    <s.icon size={i === 0 ? 36 : 26} strokeWidth={1.8} />
+                    <s.icon
+                      aria-hidden="true"
+                      size={i === 0 ? 36 : 26}
+                      strokeWidth={1.8}
+                    />
                   </span>
                 </div>
                 <div className={i === 0 ? 'mt-auto pt-14' : 'mt-10'}>

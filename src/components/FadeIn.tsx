@@ -1,5 +1,9 @@
-import { motion, type Transition } from 'framer-motion'
-import type { ReactNode, ElementType } from 'react'
+import {
+  motion,
+  useReducedMotionConfig,
+  type Transition,
+} from 'framer-motion'
+import { useMemo, type ReactNode, type ElementType } from 'react'
 
 interface FadeInProps {
   children: ReactNode
@@ -20,7 +24,8 @@ export default function FadeIn({
   y = 30,
   className = '',
 }: FadeInProps) {
-  const MotionComponent = motion.create(Component)
+  const MotionComponent = useMemo(() => motion.create(Component), [Component])
+  const shouldReduceMotion = useReducedMotionConfig() === true
 
   const transition: Transition = {
     duration,
@@ -30,10 +35,12 @@ export default function FadeIn({
 
   return (
     <MotionComponent
-      initial={{ opacity: 0, x, y }}
-      whileInView={{ opacity: 1, x: 0, y: 0 }}
+      initial={shouldReduceMotion ? false : { opacity: 0, x, y }}
+      whileInView={
+        shouldReduceMotion ? undefined : { opacity: 1, x: 0, y: 0 }
+      }
       viewport={{ once: true, margin: '50px', amount: 0 }}
-      transition={transition}
+      transition={shouldReduceMotion ? undefined : transition}
       className={className}
     >
       {children}
