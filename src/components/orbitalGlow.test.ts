@@ -13,7 +13,7 @@ describe('orbital glow model', () => {
     expect(texture).toHaveLength(size * size * 4)
     expect(alphaAt(2, 2)).toBe(255)
     expect(alphaAt(0, 0)).toBe(0)
-    expect(alphaAt(3, 2)).toBe(48)
+    expect(alphaAt(3, 2)).toBe(90)
     expect(alphaAt(3, 2)).toBeGreaterThan(0)
     expect(alphaAt(3, 2)).toBeLessThan(255)
 
@@ -23,6 +23,14 @@ describe('orbital glow model', () => {
         expect(alphaAt(x, y)).toBe(alphaAt(x, size - 1 - y))
       }
     }
+  })
+
+  it('keeps useful halo energy outside the avatar', () => {
+    const size = 101
+    const texture = createRadialGlowTextureData(size)
+    const alphaAt = (x: number, y: number) => texture[(y * size + x) * 4 + 3]
+
+    expect(alphaAt(85, 50)).toBe(42)
   })
 
   it('defines two low-opacity glow layers with distinct pulses', () => {

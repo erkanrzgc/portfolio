@@ -45,7 +45,7 @@ export function createRadialGlowTextureData(
       )
       const falloff = normalizedRadius >= 1
         ? 0
-        : Math.pow(1 - normalizedRadius, 2.4)
+        : Math.pow(1 - normalizedRadius, 1.5)
       const offset = (y * dimension + x) * 4
       data[offset] = 255
       data[offset + 1] = 255
