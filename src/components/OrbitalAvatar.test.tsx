@@ -81,6 +81,7 @@ const three = vi.hoisted(() => {
     }>,
     scenes: [] as Array<{
       add: ReturnType<typeof vi.fn>
+      children: unknown[]
     }>,
     groups: [] as Array<{
       add: ReturnType<typeof vi.fn>
@@ -108,6 +109,12 @@ const three = vi.hoisted(() => {
         setDrawRange: ReturnType<typeof vi.fn>
       }
       material: { options: Record<string, unknown> }
+      position: {
+        x: number
+        y: number
+        z: number
+        set: ReturnType<typeof vi.fn>
+      }
       scale: {
         x: number
         y: number
@@ -296,6 +303,7 @@ vi.mock('three', () => {
       }
     },
     Points: class {
+      position = createPosition()
       renderOrder = 0
       rotation = { x: 0, y: 0, z: 0 }
       scale = createScale()
@@ -620,17 +628,47 @@ describe('OrbitalAvatar', () => {
     const interactionRig = getGroup('interactionRig')
     const orbitalGroup = getGroup('orbitalGroup')
     const glowGroup = getGroup('glowGroup')
+    const orbitRigs = Array.from({ length: 11 }, (_, index) =>
+      getGroup(`orbitRig-${index}`),
+    )
 
-    expect(root.children).toContain(avatarRig)
-    expect(root.children).toContain(interactionRig)
-    expect(interactionRig.children).toContain(orbitalGroup)
-    expect(three.scenes[0].add).toHaveBeenCalledWith(glowGroup)
+    expect(three.scenes[0].children).toHaveLength(2)
+    expect(three.scenes[0].children).toEqual(
+      expect.arrayContaining([root, glowGroup]),
+    )
 
-    Array.from({ length: 11 }, (_, index) => {
-      const orbitRig = getGroup(`orbitRig-${index}`)
-      expect(orbitalGroup.children).toContain(orbitRig)
-      expect(orbitRig.children).toContain(three.lines[index])
-      expect(orbitRig.children).toContain(three.meshes[index + 2])
+    expect(root.children).toHaveLength(2)
+    expect(root.children).toEqual(
+      expect.arrayContaining([avatarRig, interactionRig]),
+    )
+
+    expect(avatarRig.children).toHaveLength(3)
+    expect(avatarRig.children).toEqual(
+      expect.arrayContaining([
+        three.meshes[0],
+        three.meshes[1],
+        three.sprites[2],
+      ]),
+    )
+
+    expect(interactionRig.children).toHaveLength(2)
+    expect(interactionRig.children).toEqual(
+      expect.arrayContaining([three.points[0], orbitalGroup]),
+    )
+
+    expect(glowGroup.children).toHaveLength(2)
+    expect(glowGroup.children).toEqual(
+      expect.arrayContaining([three.sprites[0], three.sprites[1]]),
+    )
+
+    expect(orbitalGroup.children).toHaveLength(11)
+    expect(orbitalGroup.children).toEqual(expect.arrayContaining(orbitRigs))
+
+    orbitRigs.forEach((orbitRig, index) => {
+      expect(orbitRig.children).toHaveLength(2)
+      expect(orbitRig.children).toEqual(
+        expect.arrayContaining([three.lines[index], three.meshes[index + 2]]),
+      )
     })
   })
 
