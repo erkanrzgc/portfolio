@@ -8,7 +8,7 @@ import {
 describe('orbital avatar motion', () => {
   it('is deterministic and does not mutate frozen state or input', () => {
     const state = createOrbitalMotionState()
-    const input = {
+    const input = Object.freeze({
       cancelMomentum: false,
       deltaMs: 16,
       dragDeltaX: 0.1,
@@ -16,13 +16,49 @@ describe('orbital avatar motion', () => {
       dragging: true,
       pointerX: 0.4,
       pointerY: -0.2,
-    }
+    })
     const originalInput = { ...input }
+    const first = stepOrbitalMotion(state, input)
 
     expect(Object.isFrozen(state)).toBe(true)
-    expect(stepOrbitalMotion(state, input)).toEqual(stepOrbitalMotion(state, input))
+    expect(Object.isFrozen(first)).toBe(true)
+    expect(first).toEqual(stepOrbitalMotion(state, input))
     expect(state).toEqual(createOrbitalMotionState())
     expect(input).toEqual(originalInput)
+  })
+
+  it('sanitizes invalid motion inputs and preserves pose for a zero-duration neutral frame', () => {
+    const state = Object.freeze({
+      ...createOrbitalMotionState(),
+      elapsedSeconds: 2,
+      pitch: 0.1,
+      yaw: -0.2,
+      pitchVelocity: 0.4,
+      yawVelocity: -0.5,
+    })
+    const neutral = {
+      cancelMomentum: false, deltaMs: 0, dragDeltaX: 0, dragDeltaY: 0,
+      dragging: false, pointerX: 0, pointerY: 0,
+    }
+    const expectStationary = (input: typeof neutral) => {
+      const { avatarScale: resultScale, ...resultPose } = stepOrbitalMotion(state, input)
+      const { avatarScale: stateScale, ...statePose } = state
+
+      expect(resultScale).toBe(1 + Math.sin(state.elapsedSeconds * 0.45) * 0.008)
+      expect(stateScale).toBe(1)
+      expect(resultPose).toEqual(statePose)
+    }
+
+    expectStationary(neutral)
+    expectStationary({ ...neutral, deltaMs: -16, pointerX: 1, pointerY: -1 })
+    expectStationary({
+      ...neutral,
+      deltaMs: Number.NaN,
+      pointerX: Number.POSITIVE_INFINITY,
+      pointerY: Number.NEGATIVE_INFINITY,
+      dragDeltaX: Number.NaN,
+      dragDeltaY: Number.POSITIVE_INFINITY,
+    })
   })
 
   it('caps extreme drag pose and angular velocity', () => {

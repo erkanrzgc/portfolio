@@ -45,7 +45,7 @@ const finiteOrZero = (value: number) => (Number.isFinite(value) ? value : 0)
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
-const stepSpring = (
+const stepSpringVelocity = (
   value: number,
   velocity: number,
   target: number,
@@ -53,11 +53,10 @@ const stepSpring = (
   damping: number,
   deltaSeconds: number,
 ) => {
-  if (deltaSeconds === 0) return [value, velocity] as const
+  if (deltaSeconds === 0) return velocity
 
   const acceleration = (target - value) * stiffness - velocity * damping
-  const nextVelocity = velocity + acceleration * deltaSeconds
-  return [value + nextVelocity * deltaSeconds, nextVelocity] as const
+  return velocity + acceleration * deltaSeconds
 }
 
 export const createOrbitalMotionState = (): OrbitalMotionState => Object.freeze({
@@ -115,12 +114,14 @@ export const stepOrbitalMotion = (
       )
     }
   } else if (deltaSeconds > 0) {
-    ;[pitch, pitchVelocity] = stepSpring(
+    pitchVelocity = stepSpringVelocity(
       pitch, pitchVelocity, targetPitch, ROTATION_STIFFNESS, ROTATION_DAMPING, deltaSeconds,
     )
-    ;[yaw, yawVelocity] = stepSpring(
+    pitch += pitchVelocity * deltaSeconds
+    yawVelocity = stepSpringVelocity(
       yaw, yawVelocity, targetYaw, ROTATION_STIFFNESS, ROTATION_DAMPING, deltaSeconds,
     )
+    yaw += yawVelocity * deltaSeconds
     pitch = clamp(pitch, -ORBITAL_MOTION_LIMITS.maxPitch, ORBITAL_MOTION_LIMITS.maxPitch)
     yaw = clamp(yaw, -ORBITAL_MOTION_LIMITS.maxYaw, ORBITAL_MOTION_LIMITS.maxYaw)
     pitchVelocity = clamp(
@@ -143,15 +144,18 @@ export const stepOrbitalMotion = (
   const avatarXVelocity = input.cancelMomentum ? 0 : state.avatarXVelocity
   const avatarYVelocity = input.cancelMomentum ? 0 : state.avatarYVelocity
   const avatarRollVelocity = input.cancelMomentum ? 0 : state.avatarRollVelocity
-  let [avatarX, nextAvatarXVelocity] = stepSpring(
+  const nextAvatarXVelocity = stepSpringVelocity(
     state.avatarX, avatarXVelocity, targetAvatarX, AVATAR_STIFFNESS, AVATAR_DAMPING, deltaSeconds,
   )
-  let [avatarY, nextAvatarYVelocity] = stepSpring(
+  const nextAvatarYVelocity = stepSpringVelocity(
     state.avatarY, avatarYVelocity, targetAvatarY, AVATAR_STIFFNESS, AVATAR_DAMPING, deltaSeconds,
   )
-  let [avatarRoll, nextAvatarRollVelocity] = stepSpring(
+  const nextAvatarRollVelocity = stepSpringVelocity(
     state.avatarRoll, avatarRollVelocity, targetAvatarRoll, AVATAR_STIFFNESS, AVATAR_DAMPING, deltaSeconds,
   )
+  let avatarX = state.avatarX + nextAvatarXVelocity * deltaSeconds
+  let avatarY = state.avatarY + nextAvatarYVelocity * deltaSeconds
+  let avatarRoll = state.avatarRoll + nextAvatarRollVelocity * deltaSeconds
   const elapsedSeconds = state.elapsedSeconds + deltaSeconds
 
   avatarX = clamp(avatarX, -ORBITAL_MOTION_LIMITS.maxAvatarX, ORBITAL_MOTION_LIMITS.maxAvatarX)
