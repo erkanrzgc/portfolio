@@ -16,6 +16,9 @@ describe('GithubContributions', () => {
       'https://ghchart.rshah.org/39d353/erkanrzgc'
     )
     expect(image).toHaveAttribute('loading', 'lazy')
+    expect(image).toHaveAttribute('width', '663')
+    expect(image).toHaveAttribute('height', '104')
+    expect(image).toHaveClass('h-auto', 'w-full')
 
     const profileLink = image.closest('a')
     expect(profileLink).toHaveAttribute('href', 'https://github.com/erkanrzgc')

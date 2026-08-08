@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   fallbackProjects,
-  formatUpdatedAt,
   getDisplayRepos,
   type GithubRepo,
   type PortfolioProject,
@@ -92,23 +91,5 @@ describe('fallbackProjects', () => {
     const projects: PortfolioProject[] = fallbackProjects
 
     expect(projects.map((project) => project.name)).toEqual(LEGACY_FALLBACK_ORDER)
-  })
-})
-
-describe('formatUpdatedAt', () => {
-  it('returns a fallback label for an invalid date', () => {
-    expect(formatUpdatedAt('not-a-date')).toBe('Recently updated')
-  })
-
-  it('formats a valid ISO date without relying on a timezone-fragile day', () => {
-    const formatted = formatUpdatedAt('2026-07-31T11:49:02Z')
-
-    expect(formatted).toContain('Jul')
-    expect(formatted).toContain('2026')
-    expect(formatted).not.toBe('Recently updated')
-  })
-
-  it('formats update dates using the UTC calendar day', () => {
-    expect(formatUpdatedAt('2026-07-31T23:30:00Z')).toBe('Jul 31, 2026')
   })
 })

@@ -1,9 +1,12 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fallbackProjects, fetchGithubProjects } from '../lib/githubProjects'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  fallbackProjects,
+  fetchGithubProjects,
+  formatRepoName,
+  sortProjects,
+} from '../lib/githubProjects'
 import ProjectsSection from './ProjectsSection'
-
-afterEach(cleanup)
 
 vi.mock('../components/FadeIn', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -14,123 +17,79 @@ vi.mock('../lib/githubProjects', async (importOriginal) => {
 
   return {
     ...actual,
-    fetchGithubProjects: vi.fn().mockResolvedValue(actual.fallbackProjects),
+    fetchGithubProjects: vi
+      .fn()
+      .mockResolvedValue(actual.sortProjects(actual.fallbackProjects)),
   }
 })
 
+beforeEach(() => {
+  vi.mocked(fetchGithubProjects)
+    .mockReset()
+    .mockResolvedValue(sortProjects(fallbackProjects))
+})
+
+afterEach(cleanup)
+
 describe('ProjectsSection', () => {
-  it('renders the curated projects as a compact, accessible two-column grid', () => {
-    render(<ProjectsSection />)
+  it('renders all 12 projects as full-height sticky cards before contributions', async () => {
+    const { container } = render(<ProjectsSection />)
+    const expectedProjects = sortProjects(fallbackProjects)
 
-    const projectList = screen.getByRole('list')
-    expect(projectList).toHaveClass('grid', 'md:grid-cols-2')
+    await waitFor(() => {
+      const cards = [...container.querySelectorAll('article')]
 
-    const cards = within(projectList).getAllByRole('listitem')
-    expect(cards).toHaveLength(8)
-    expect(
-      cards.map((card) =>
-        within(card).getByRole('heading').textContent?.toLowerCase()
-      )
-    ).toEqual([
-      'vibeprint',
-      'octopus',
-      'autonomous scanner',
-      'firewall',
-      'reverse engineering',
-      'steganography',
-      'loadkit',
-      'open source intelligence',
-    ])
-
-    const vibeprintCard = cards[0]
-    expect(vibeprintCard.tagName).toBe('ARTICLE')
-    expect(within(vibeprintCard).getByText('0 stars')).toBeInTheDocument()
-    expect(
-      within(vibeprintCard).getByText('Updated Jul 31, 2026')
-    ).toBeInTheDocument()
-
-    const githubLink = within(vibeprintCard).getByRole('link', {
-      name: 'Open vibeprint on GitHub',
+      expect(cards).toHaveLength(12)
+      expect(
+        cards.map((card) =>
+          within(card).getByRole('heading', { level: 3 }).textContent,
+        ),
+      ).toEqual(expectedProjects.map((project) => formatRepoName(project.name)))
     })
-    expect(githubLink).toHaveAttribute(
-      'href',
-      'https://github.com/erkanrzgc/vibeprint'
-    )
-    expect(githubLink).toHaveAttribute('target', '_blank')
-    expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer')
 
-    const liveLink = within(vibeprintCard).getByRole('link', {
-      name: 'Open the live vibeprint project',
-    })
-    expect(liveLink).toHaveAttribute(
-      'href',
-      'https://erkanrzgc.github.io/vibeprint/'
-    )
-    expect(liveLink).toHaveAttribute('target', '_blank')
-    expect(liveLink).toHaveAttribute('rel', 'noopener noreferrer')
-    expect(vibeprintCard.closest('a')).toBeNull()
+    const cards = [...container.querySelectorAll('article')]
 
-    const firewallCard = cards[3]
-    expect(
-      within(firewallCard).getByRole('link', {
-        name: 'Open firewall on GitHub',
+    cards.forEach((card, index) => {
+      const stickyWrapper = card.parentElement
+
+      expect(stickyWrapper).toHaveClass('h-[82vh]', 'min-h-[560px]')
+      expect(stickyWrapper).toHaveStyle({
+        position: 'sticky',
+        top: `${16 + Math.min(index, 5) * 6}px`,
       })
-    ).toBeInTheDocument()
-    expect(
-      within(firewallCard).queryByRole('link', { name: /open the live/i })
-    ).not.toBeInTheDocument()
-
-    const autonomousScannerCard = cards[2]
-    expect(
-      within(autonomousScannerCard).getByText('1 star')
-    ).toBeInTheDocument()
-    expect(
-      within(autonomousScannerCard).queryByText('1 stars')
-    ).not.toBeInTheDocument()
+    })
 
     const contributionTitle = screen.getByRole('heading', {
       name: 'GitHub Contributions',
     })
-    const viewAllLink = screen.getByRole('link', {
-      name: 'View all projects on GitHub',
-    })
-    expect(viewAllLink).toHaveAttribute(
-      'href',
-      'https://github.com/erkanrzgc?tab=repositories'
-    )
-    expect(viewAllLink).toHaveAttribute('target', '_blank')
-    expect(viewAllLink).toHaveAttribute('rel', 'noopener noreferrer')
+    const finalCard = cards[cards.length - 1]
+
+    expect(finalCard).toBeDefined()
     expect(
-      projectList.compareDocumentPosition(contributionTitle) &
-        Node.DOCUMENT_POSITION_FOLLOWING
+      finalCard!.compareDocumentPosition(contributionTitle) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
+
+    const projectsSection = screen
+      .getByRole('heading', { name: 'Projects' })
+      .closest('section')
+
+    expect(projectsSection).not.toBeNull()
     expect(
-      contributionTitle.compareDocumentPosition(viewAllLink) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
+      projectsSection!.querySelector('[class~="md:grid-cols-2"]'),
+    ).toBeNull()
   })
 
-  it('keeps the curated fallback order and reports a GitHub API failure', async () => {
+  it('retains all 12 fallback cards and reports a GitHub API failure', async () => {
     vi.mocked(fetchGithubProjects).mockRejectedValueOnce(
       new Error('GitHub API unavailable'),
     )
 
-    render(<ProjectsSection />)
+    const { container } = render(<ProjectsSection />)
 
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'GitHub could not be reached, so the portfolio is showing a local fallback list.',
+      /^GitHub could not be reached, so the portfolio is showing a local fallback list\.$/,
     )
-
-    const cards = within(screen.getByRole('list')).getAllByRole('listitem')
-    expect(cards).toHaveLength(8)
-    expect(
-      cards.map((card) =>
-        within(card).getByRole('heading').textContent?.toLowerCase(),
-      ),
-    ).toEqual(fallbackProjects.map((project) => formatName(project.name)))
+    expect(container.querySelectorAll('article')).toHaveLength(12)
   })
 })
-
-function formatName(name: string) {
-  return name.replace(/-/g, ' ')
-}

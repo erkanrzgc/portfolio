@@ -208,21 +208,6 @@ export function formatRepoName(name: string) {
   return name.replace(/-/g, ' ')
 }
 
-export function formatUpdatedAt(updatedAt: string) {
-  const date = new Date(updatedAt)
-
-  if (Number.isNaN(date.getTime())) {
-    return 'Recently updated'
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(date)
-}
-
 export function mapRepoToProject(repo: GithubRepo): PortfolioProject {
   return {
     name: repo.name,

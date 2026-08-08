@@ -49,6 +49,8 @@ export default function GithubContributions() {
               src={CHART_URL}
               alt="Erkan GitHub contribution activity"
               loading="lazy"
+              width="663"
+              height="104"
               onError={() => setImageFailed(true)}
               className="h-auto w-full rounded-xl opacity-90"
             />
