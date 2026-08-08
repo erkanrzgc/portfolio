@@ -52,7 +52,7 @@ function ProjectCard({
   return (
     <div
       ref={cardRef}
-      className="h-[82vh] min-h-[560px] lg:min-h-[600px]"
+      className="h-[82vh] min-h-[560px] focus-within:z-50 lg:min-h-[600px]"
       style={{ position: 'sticky', top: `${16 + Math.min(index, 5) * 6}px` }}
     >
       <motion.article

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { useReducedMotion } from 'framer-motion'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -154,6 +154,37 @@ describe('ProjectsSection', () => {
         'focus-visible:ring-offset-[#0C0C0C]',
       )
     }
+  })
+
+  it('elevates every sticky card wrapper when focus moves backward into it', async () => {
+    const { container } = render(<ProjectsSection />)
+    const liveProjects = await waitForLiveProjects(container)
+    const cards = [...container.querySelectorAll('article')]
+    const stickyWrappers = cards.map((card) => card.parentElement)
+
+    stickyWrappers.forEach((stickyWrapper) => {
+      expect(stickyWrapper).toHaveClass('focus-within:z-50')
+    })
+
+    const previousCardLinks = within(cards[0]).getAllByRole('link')
+    const previousLink = previousCardLinks[previousCardLinks.length - 1]
+    const laterCardPreview = within(cards[1]).getByRole('link', {
+      name: `Preview ${formatRepoName(liveProjects[1].name)} repository on GitHub`,
+    })
+
+    laterCardPreview.focus()
+    expect(laterCardPreview).toHaveFocus()
+    expect(
+      fireEvent.keyDown(laterCardPreview, {
+        key: 'Tab',
+        shiftKey: true,
+      }),
+    ).toBe(true)
+
+    // JSDOM does not perform native Tab traversal, so move to its prior tab stop.
+    previousLink.focus()
+    expect(previousLink).toHaveFocus()
+    expect(previousLink.closest('article')?.parentElement).toBe(stickyWrappers[0])
   })
 
   it('exposes exactly one project heading per article', async () => {
