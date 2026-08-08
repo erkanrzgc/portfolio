@@ -1,5 +1,49 @@
-import { useReducedMotion } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
+
+function getPrefersReducedMotion() {
+  if (
+    typeof window === 'undefined' ||
+    typeof window.matchMedia !== 'function'
+  ) {
+    return false
+  }
+
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches
+}
+
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    getPrefersReducedMotion,
+  )
+
+  useEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      typeof window.matchMedia !== 'function'
+    ) {
+      return
+    }
+
+    const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY)
+    const handleChange = (event: MediaQueryListEvent) => {
+      setPrefersReducedMotion(event.matches)
+    }
+
+    setPrefersReducedMotion(mediaQuery.matches)
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleChange)
+      return () => mediaQuery.removeEventListener('change', handleChange)
+    }
+
+    mediaQuery.addListener(handleChange)
+    return () => mediaQuery.removeListener(handleChange)
+  }, [])
+
+  return prefersReducedMotion
+}
 
 interface MagnetProps {
   children: ReactNode
@@ -21,7 +65,7 @@ export default function Magnet({
   const ref = useRef<HTMLDivElement>(null)
   const [transform, setTransform] = useState('translate3d(0px, 0px, 0px)')
   const [transition, setTransition] = useState(inactiveTransition)
-  const shouldReduceMotion = useReducedMotion() === true
+  const shouldReduceMotion = usePrefersReducedMotion()
 
   useEffect(() => {
     if (!shouldReduceMotion) return
