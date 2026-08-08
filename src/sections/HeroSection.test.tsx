@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import HeroSection from './HeroSection'
 
@@ -9,79 +9,44 @@ vi.mock('../components/FadeIn', () => ({
 }))
 
 vi.mock('../components/OrbitalAvatar', () => ({
-  default: ({
-    className,
-    onReady,
-    onUnavailable,
-  }: {
-    className?: string
-    onReady?: () => void
-    onUnavailable?: () => void
-  }) => (
-    <div className={className} data-testid="orbital-avatar">
-      <button data-testid="orbital-ready" onClick={onReady} type="button">
-        Orbital avatar ready
-      </button>
-      <button
-        data-testid="orbital-unavailable"
-        onClick={onUnavailable}
-        type="button"
-      >
-        Orbital avatar unavailable
-      </button>
-    </div>
+  default: () => (
+    <canvas className="hero-orbital-avatar" data-testid="orbital-avatar" />
   ),
 }))
 
 describe('HeroSection', () => {
-  it('keeps accessible avatar text while fading the visual fallback after scene readiness', () => {
+  it('renders the eager legacy avatar inside the float and magnet wrappers', () => {
     render(<HeroSection />)
-    const avatar = screen.getByRole('img', { name: 'Erkan avatar' })
-    const fallback = avatar.closest('[data-avatar-fallback]')
-    expect(fallback).toHaveClass('opacity-100')
-    expect(fallback).toHaveAttribute('data-state', 'loading')
-    fireEvent.click(screen.getByTestId('orbital-ready'))
-    expect(screen.getByRole('img', { name: 'Erkan avatar' })).toBeInTheDocument()
-    expect(fallback).toHaveClass('opacity-0')
-    expect(fallback).toHaveAttribute('data-state', 'ready')
 
-    fireEvent.click(screen.getByTestId('orbital-unavailable'))
-    expect(screen.getByRole('img', { name: 'Erkan avatar' })).toBeInTheDocument()
-    expect(fallback).toHaveClass('opacity-100')
-    expect(fallback).toHaveAttribute('data-state', 'loading')
+    const avatar = screen.getByRole('img', { name: 'Erkan avatar' })
+    const floatWrapper = avatar.closest('.hero-avatar-float')
+    const magnetWrapper = avatar.closest('.hero-avatar-magnet')
+
+    expect(avatar).toHaveAttribute('src', '/images/avatar-transparent.png')
+    expect(avatar).toHaveAttribute('loading', 'eager')
+    expect(floatWrapper).not.toBeNull()
+    expect(magnetWrapper).not.toBeNull()
+    expect(magnetWrapper).toContainElement(floatWrapper as HTMLElement)
+    expect(floatWrapper).toContainElement(avatar)
   })
 
-  it('renders one eager avatar fallback alongside the existing hero content', () => {
+  it('retains the navigation and legacy hero copy', () => {
     render(<HeroSection />)
 
-    expect(screen.getAllByTestId('orbital-ready')).toHaveLength(1)
-    const avatar = screen.getByRole('img', { name: 'Erkan avatar' })
-    const fallback = avatar.closest('[data-avatar-fallback]')
-    const fallbackMotion = fallback?.querySelector(
-      '[data-avatar-fallback-motion]',
-    )
-    expect(fallback).toHaveClass(
-      'absolute',
-      'aspect-square',
-      'left-1/2',
-      'top-1/2',
-      'w-[min(52vw,430px)]',
-      '-translate-x-1/2',
-      '-translate-y-1/2',
-    )
-    expect(fallback).not.toHaveClass('hero-avatar-fallback-motion')
-    expect(fallbackMotion).toHaveClass('hero-avatar-fallback-motion')
-    expect(fallbackMotion).toContainElement(avatar)
-    expect(avatar).toHaveClass('w-full', 'object-contain')
-    expect(avatar).toHaveAttribute(
-      'src',
-      '/images/avatar-transparent.png',
-    )
-    expect(avatar).toHaveAttribute(
-      'loading',
-      'eager',
-    )
-    expect(screen.getByRole('navigation')).toBeInTheDocument()
+    const navigation = screen.getByRole('navigation')
+    const expectedLinks = [
+      ['About', '#about'],
+      ['Services', '#services'],
+      ['Projects', '#projects'],
+      ['Contact', '#contact'],
+    ]
+
+    expectedLinks.forEach(([name, href]) => {
+      expect(within(navigation).getByRole('link', { name })).toHaveAttribute(
+        'href',
+        href,
+      )
+    })
     expect(
       screen.getByRole('heading', { name: "Hi, i'm erkan" }),
     ).toBeInTheDocument()
@@ -90,11 +55,12 @@ describe('HeroSection', () => {
     ).toBeInTheDocument()
   })
 
-  it('marks the orbital canvas host for reduced-motion transition overrides', () => {
-    render(<HeroSection />)
+  it('does not render the orbital canvas or its fallback state', () => {
+    const { container } = render(<HeroSection />)
 
-    expect(screen.getByTestId('orbital-avatar')).toHaveClass(
-      'hero-orbital-avatar',
-    )
+    expect(container.querySelector('canvas')).not.toBeInTheDocument()
+    expect(container.querySelector('.hero-orbital-avatar')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-avatar-fallback]')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('orbital-avatar')).not.toBeInTheDocument()
   })
 })
