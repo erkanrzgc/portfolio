@@ -44,6 +44,20 @@ function animationValue(rule: CSSStyleRule): string {
 }
 
 describe('legacy hero global styles', () => {
+  it('positions the html scroll measurement container', () => {
+    const positionedHtmlRule = allStyleRules().find(
+      ({ media, rule }) =>
+        media.length === 0 &&
+        rule.selectorText
+          .split(',')
+          .map((selector) => selector.trim())
+          .includes('html') &&
+        rule.style.getPropertyValue('position') === 'relative',
+    )
+
+    expect(positionedHtmlRule).toBeDefined()
+  })
+
   it('animates the floating avatar only for touch or coarse pointers', () => {
     const floatAnimationRules = allStyleRules().filter(
       ({ rule }) =>
