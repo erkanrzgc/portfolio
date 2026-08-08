@@ -1,4 +1,5 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useReducedMotion } from 'framer-motion'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 interface MagnetProps {
   children: ReactNode
@@ -20,9 +21,17 @@ export default function Magnet({
   const ref = useRef<HTMLDivElement>(null)
   const [transform, setTransform] = useState('translate3d(0px, 0px, 0px)')
   const [transition, setTransition] = useState(inactiveTransition)
+  const shouldReduceMotion = useReducedMotion() === true
+
+  useEffect(() => {
+    if (!shouldReduceMotion) return
+
+    setTransform('translate3d(0px, 0px, 0px)')
+    setTransition(inactiveTransition)
+  }, [inactiveTransition, shouldReduceMotion])
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!ref.current) return
+    if (!ref.current || shouldReduceMotion) return
     const rect = ref.current.getBoundingClientRect()
     const centerX = rect.left + rect.width / 2
     const centerY = rect.top + rect.height / 2

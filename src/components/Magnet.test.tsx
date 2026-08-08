@@ -1,6 +1,18 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Magnet from './Magnet'
+
+const reducedMotionPreference = vi.hoisted(() => ({
+  enabled: false,
+}))
+
+vi.mock('framer-motion', () => ({
+  useReducedMotion: () => reducedMotionPreference.enabled,
+}))
+
+beforeEach(() => {
+  reducedMotionPreference.enabled = false
+})
 
 afterEach(() => {
   cleanup()
@@ -77,5 +89,54 @@ describe('Magnet', () => {
     fireEvent.mouseLeave(magnet as HTMLElement)
 
     expect(translation(magnet as HTMLElement)).toEqual({ x: 0, y: 0 })
+  })
+
+  it('stays at rest when reduced motion is already requested', () => {
+    reducedMotionPreference.enabled = true
+    render(
+      <Magnet strength={2}>
+        <span>Magnetic content</span>
+      </Magnet>,
+    )
+    const magnet = screen.getByText('Magnetic content').parentElement
+
+    expect(magnet).not.toBeNull()
+    const rect = mockRect(magnet as HTMLElement)
+    movePointer(magnet as HTMLElement, 75, 80)
+
+    expect(translation(magnet as HTMLElement)).toEqual({ x: 0, y: 0 })
+    expect(rect).not.toHaveBeenCalled()
+  })
+
+  it('resets and stops tracking when reduced motion becomes requested', () => {
+    const inactiveTransition = 'transform 1s ease-in-out'
+    const rendered = render(
+      <Magnet strength={2} inactiveTransition={inactiveTransition}>
+        <span>Magnetic content</span>
+      </Magnet>,
+    )
+    const magnet = screen.getByText('Magnetic content').parentElement
+
+    expect(magnet).not.toBeNull()
+    const rect = mockRect(magnet as HTMLElement)
+    movePointer(magnet as HTMLElement, 75, 80)
+    expect(translation(magnet as HTMLElement).x).toBeGreaterThan(0)
+
+    reducedMotionPreference.enabled = true
+    rendered.rerender(
+      <Magnet strength={2} inactiveTransition={inactiveTransition}>
+        <span>Magnetic content</span>
+      </Magnet>,
+    )
+
+    expect(translation(magnet as HTMLElement)).toEqual({ x: 0, y: 0 })
+    expect((magnet as HTMLElement).style.transition).toBe(inactiveTransition)
+
+    const layoutReads = rect.mock.calls.length
+    movePointer(magnet as HTMLElement, 80, 85)
+
+    expect(translation(magnet as HTMLElement)).toEqual({ x: 0, y: 0 })
+    expect((magnet as HTMLElement).style.transition).toBe(inactiveTransition)
+    expect(rect).toHaveBeenCalledTimes(layoutReads)
   })
 })
