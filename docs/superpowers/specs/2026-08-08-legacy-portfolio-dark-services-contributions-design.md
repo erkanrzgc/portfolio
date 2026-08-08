@@ -33,7 +33,9 @@ spacing, responsive behavior, and FadeIn timing. Only its color treatment
 changes:
 
 - section background: the site's existing `#0C0C0C` black;
-- heading and service names: `#D7E2EA` or the existing hero-heading gradient;
+- section heading: the existing `hero-heading` gradient used elsewhere in the
+  restored page;
+- service names: solid `#D7E2EA`;
 - descriptions and secondary copy: existing light blue-grey with reduced
   opacity;
 - separators, icon borders, and tag outlines: subtle translucent light grey;
@@ -47,14 +49,14 @@ interactions.
 
 - Reuse the current standalone `GithubContributions` component.
 - Keep GitHub's green palette (`#39D353` and `#7EE787`).
-- Render it inside the Projects section after every sticky project card and
-  before the footer.
+- Render it inside the Projects section after the complete sticky project-card
+  stack and before the footer.
 - Keep the chart linked to `https://github.com/erkanrzgc`.
 - Keep lazy loading, accessible alternative text, keyboard focus styles,
   secure external-link attributes, and the GitHub profile fallback when the
   chart image cannot load.
-- Add intrinsic chart dimensions when they can be represented without
-  changing responsive width, to reduce layout shift.
+- Give the chart `width="663"` and `height="104"` while retaining responsive
+  `w-full h-auto` styling, reducing layout shift without changing its layout.
 
 ## Architecture and Scope
 
@@ -68,8 +70,8 @@ Expected runtime changes include:
 
 - restore `Magnet` and the legacy Hero implementation;
 - restore the legacy Services and Projects implementations;
-- restore legacy supporting CSS and project data behavior needed by those
-  sections;
+- restore legacy supporting CSS and the `c248614` project data, ordering, and
+  fetch behavior needed by those sections;
 - remove runtime-only orbital, geometry, glow, motion, and spotlight modules;
 - remove the Three.js production dependency when no runtime import remains.
 
