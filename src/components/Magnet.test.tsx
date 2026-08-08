@@ -142,8 +142,9 @@ describe('Magnet', () => {
 
   it('stays at rest when reduced motion is already requested', () => {
     const mediaQuery = installReducedMotionQuery(true)
+    const inactiveTransition = 'transform 1s ease-in-out'
     render(
-      <Magnet strength={2}>
+      <Magnet strength={2} inactiveTransition={inactiveTransition}>
         <span>Magnetic content</span>
       </Magnet>,
     )
@@ -154,6 +155,7 @@ describe('Magnet', () => {
     movePointer(magnet as HTMLElement, 75, 80)
 
     expect(translation(magnet as HTMLElement)).toEqual({ x: 0, y: 0 })
+    expect((magnet as HTMLElement).style.transition).toBe('none')
     expect(rect).not.toHaveBeenCalled()
     expect(matchMedia).toHaveBeenCalledWith(REDUCED_MOTION_QUERY)
     expect(mediaQuery.addEventListener).toHaveBeenCalledWith(
@@ -162,7 +164,7 @@ describe('Magnet', () => {
     )
   })
 
-  it('resets and stops tracking when reduced motion becomes requested', () => {
+  it('snaps, pauses, and resumes tracking as reduced motion changes', () => {
     const mediaQuery = installReducedMotionQuery(false)
     const inactiveTransition = 'transform 1s ease-in-out'
     const rendered = render(
@@ -183,14 +185,33 @@ describe('Magnet', () => {
     })
 
     expect(translation(magnet as HTMLElement)).toEqual({ x: 0, y: 0 })
-    expect((magnet as HTMLElement).style.transition).toBe(inactiveTransition)
+    expect((magnet as HTMLElement).style.transition).toBe('none')
 
     const layoutReads = rect.mock.calls.length
     movePointer(magnet as HTMLElement, 80, 85)
 
     expect(translation(magnet as HTMLElement)).toEqual({ x: 0, y: 0 })
+    expect((magnet as HTMLElement).style.transition).toBe('none')
+    expect(rect).toHaveBeenCalledTimes(layoutReads)
+
+    act(() => {
+      mediaQuery.matches = false
+      mediaQuery.dispatchEvent(createMediaQueryChangeEvent(mediaQuery))
+    })
+
+    expect(translation(magnet as HTMLElement)).toEqual({ x: 0, y: 0 })
     expect((magnet as HTMLElement).style.transition).toBe(inactiveTransition)
     expect(rect).toHaveBeenCalledTimes(layoutReads)
+
+    movePointer(magnet as HTMLElement, 80, 85)
+
+    const resumedOffset = translation(magnet as HTMLElement)
+    expect(resumedOffset.x).toBeGreaterThan(0)
+    expect(resumedOffset.y).toBeGreaterThan(0)
+    expect((magnet as HTMLElement).style.transition).toBe(
+      'transform 0.3s ease-out',
+    )
+    expect(rect).toHaveBeenCalledTimes(layoutReads + 1)
 
     const changeListener = mediaQuery.addEventListener.mock.calls[0][1]
     rendered.unmount()

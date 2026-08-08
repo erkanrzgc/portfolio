@@ -68,10 +68,13 @@ export default function Magnet({
   const shouldReduceMotion = usePrefersReducedMotion()
 
   useEffect(() => {
-    if (!shouldReduceMotion) return
+    if (!shouldReduceMotion) {
+      setTransition(inactiveTransition)
+      return
+    }
 
     setTransform('translate3d(0px, 0px, 0px)')
-    setTransition(inactiveTransition)
+    setTransition('none')
   }, [inactiveTransition, shouldReduceMotion])
 
   const handleMouseMove = (e: React.MouseEvent) => {
