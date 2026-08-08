@@ -227,7 +227,9 @@ export async function fetchGithubProjects() {
 }
 ```
 
-Do not retain `CURATED_PROJECT_NAMES`, `curatedProjectNames`, `mergeWithFallback`, or `formatUpdatedAt`.
+Do not retain `CURATED_PROJECT_NAMES`, `curatedProjectNames`, or `mergeWithFallback`.
+
+Temporarily retain the existing tested `formatUpdatedAt` export because the current compact `ProjectsSection` still imports it. Keep its three existing tests (invalid date, valid ISO date, and UTC calendar day) until Task 4 restores the legacy Projects component; Task 4 must then remove both this compatibility export and those three tests.
 
 - [ ] **Step 4: Run the project-data tests and build**
 
@@ -520,6 +522,8 @@ git commit -m "feat: restore dark legacy services"
 - Modify: `src/sections/ProjectsSection.test.tsx`
 - Modify: `src/components/GithubContributions.tsx`
 - Modify: `src/components/GithubContributions.test.tsx`
+- Modify: `src/lib/githubProjects.ts`
+- Modify: `src/lib/githubProjects.test.ts`
 
 - [ ] **Step 1: Write failing sticky-layout and intrinsic-chart tests**
 
@@ -637,7 +641,17 @@ Update the existing chart image in `src/components/GithubContributions.tsx`:
 />
 ```
 
-- [ ] **Step 5: Run focused tests and build**
+- [ ] **Step 5: Remove the temporary date-format compatibility shim**
+
+After the legacy `ProjectsSection` no longer imports `formatUpdatedAt`, remove the export from `src/lib/githubProjects.ts` and remove its three focused tests from `src/lib/githubProjects.test.ts`. Confirm no production or test import remains:
+
+```powershell
+rg -n "formatUpdatedAt" src
+```
+
+Expected: no matches.
+
+- [ ] **Step 6: Run focused tests and build**
 
 ```powershell
 npm test -- --run src/sections/ProjectsSection.test.tsx src/components/GithubContributions.test.tsx src/lib/githubProjects.test.ts
@@ -646,10 +660,10 @@ npm run build
 
 Expected: all focused tests pass and build succeeds.
 
-- [ ] **Step 6: Commit Projects and Contributions**
+- [ ] **Step 7: Commit Projects and Contributions**
 
 ```powershell
-git add src/sections/ProjectsSection.tsx src/sections/ProjectsSection.test.tsx src/components/GithubContributions.tsx src/components/GithubContributions.test.tsx
+git add src/sections/ProjectsSection.tsx src/sections/ProjectsSection.test.tsx src/components/GithubContributions.tsx src/components/GithubContributions.test.tsx src/lib/githubProjects.ts src/lib/githubProjects.test.ts
 git commit -m "feat: restore sticky projects with contributions"
 ```
 
