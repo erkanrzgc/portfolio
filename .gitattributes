@@ -1,0 +1,10 @@
+# Bu dosyalar Linux konteynerinde yorumlanıyor ve derleme sunucusu onları
+# doğrudan depodan çekiyor. Satır sonu, katkı yapanın core.autocrlf
+# ayarına bırakılmayacak kadar önemli: doğrulanan içerik ile derlenen
+# içerik aynı olmak zorunda.
+#
+# Ölçüldü: Linux klonunda üçü de 0 CR ile geliyor. Bu satırlar o durumu
+# garanti altına alıyor, bir bozukluğu düzeltmiyor.
+Dockerfile      text eol=lf
+nginx.conf      text eol=lf
+.dockerignore   text eol=lf

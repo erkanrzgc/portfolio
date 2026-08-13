@@ -1,0 +1,11 @@
+# Derleme bağlamını küçük tutar ve iş istasyonundaki artıkların imaja
+# sızmasını engeller. node_modules özellikle önemli: yerelde kurulmuş
+# platforma özgü ikililer alpine konteynerinde çalışmaz.
+node_modules
+dist
+.git
+.vercel
+.env
+.env.*
+!.env.example
+npm-debug.log*
