@@ -2,8 +2,11 @@
 #
 # Anahtar sunucuda `-deploy=portfolio` kapsamıyla kayıtlı: bu uygulamayı
 # dağıtmaktan başka hiçbir şey yapamaz (uygulama tanımını okuyamaz, başka
-# uygulamaya dokunamaz). Bu yüzden commit açıkça veriliyor: CI'ın test ettiği
-# commit'in kendisi.
+# uygulamaya dokunamaz). Bu yüzden commit açıkça veriliyor: bu koşuyu
+# tetikleyen commit.
+#
+# Bu iş akışı test KOŞMAZ: main'e gelen her commit canlıya çıkar. Yalnız
+# test edilmiş commit isteniyorsa önce bir test işi, sonra `needs:` eklenir.
 #
 # Güvenlik: bu iş akışı yalnızca bu deponun main dalına push'ta ve elle
 # çalışır. pull_request_target KULLANILMAZ — orada sırlar fork kodunun
@@ -21,8 +24,8 @@ on:
 permissions:
   contents: read
 
-# Dağıtımlar sıraya girer, yarıda kesilmez: kesilen bir dağıtım sürümü
-# yarım bırakmaz ama sıradaki push'u beklemek daha anlaşılır.
+# Dağıtımlar sıraya girer; çalışan bir dağıtım yeni push yüzünden iptal
+# edilmez.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
