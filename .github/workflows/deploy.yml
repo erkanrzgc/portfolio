@@ -1,0 +1,62 @@
+# main'e her push canlıya dağıtılır (Kadran, yalnızca dağıtım yapabilen anahtar).
+#
+# Anahtar sunucuda `-deploy=portfolio` kapsamıyla kayıtlı: bu uygulamayı
+# dağıtmaktan başka hiçbir şey yapamaz (uygulama tanımını okuyamaz, başka
+# uygulamaya dokunamaz). Bu yüzden commit açıkça veriliyor: CI'ın test ettiği
+# commit'in kendisi.
+#
+# Güvenlik: bu iş akışı yalnızca bu deponun main dalına push'ta ve elle
+# çalışır. pull_request_target KULLANILMAZ — orada sırlar fork kodunun
+# yanında olurdu.
+#
+# Sırlar: KADRAN_DEPLOY_KEY (özel anahtar), KADRAN_HOST_KEY (sunucunun
+# known_hosts satırları), KADRAN_TARGET (panely-client@sunucu).
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Dağıtımlar sıraya girer, yarıda kesilmez: kesilen bir dağıtım sürümü
+# yarım bırakmaz ama sıradaki push'u beklemek daha anlaşılır.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      KADRAN_VERSION: v0.3.0
+    steps:
+      - name: kadran'ı indir ve doğrula
+        working-directory: ${{ runner.temp }}
+        run: |
+          base="https://github.com/erkanrzgc/kadran/releases/download/${KADRAN_VERSION}"
+          curl -fsSLO "$base/kadran-${KADRAN_VERSION}-linux-amd64"
+          curl -fsSLO "$base/SHA256SUMS"
+          # Yalnız indirilen dosya denetlenir; hiçbiri denetlenemezse hata.
+          sha256sum -c --ignore-missing SHA256SUMS
+          install -m 755 "kadran-${KADRAN_VERSION}-linux-amd64" kadran
+          ./kadran version
+
+      - name: SSH kimliği
+        env:
+          KEY: ${{ secrets.KADRAN_DEPLOY_KEY }}
+          HOST_KEY: ${{ secrets.KADRAN_HOST_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+
+      - name: Dağıt
+        env:
+          TARGET: ${{ secrets.KADRAN_TARGET }}
+        run: |
+          "$RUNNER_TEMP/kadran" deploy -commit "$GITHUB_SHA" portfolio "$TARGET"
